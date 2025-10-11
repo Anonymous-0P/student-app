@@ -6,14 +6,22 @@ if(isset($_POST['signup'])){
     $email = $_POST['email'];
     $password = password_hash($_POST['password'], PASSWORD_BCRYPT);
     $role = $_POST['role'];
+    $roll_no = isset($_POST['roll_no']) ? trim($_POST['roll_no']) : null;
+    $course = isset($_POST['course']) ? trim($_POST['course']) : null;
+    $year = isset($_POST['year']) ? (int)$_POST['year'] : null;
+    $department = isset($_POST['department']) ? trim($_POST['department']) : null;
 
-    $stmt = $conn->prepare("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)");
-    $stmt->bind_param("ssss", $name, $email, $password, $role);
-
-    if($stmt->execute()){
-        header("Location: login.php");
+    if ($role === 'student' && (empty($roll_no) || empty($course))) {
+        $error = "Please fill required student fields: Roll Number and Course.";
     } else {
-        $error = "Error: " . $conn->error;
+        $stmt = $conn->prepare("INSERT INTO users (name, email, password, role, roll_no, course, year, department) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("ssssssis", $name, $email, $password, $role, $roll_no, $course, $year, $department);
+
+        if($stmt->execute()){
+            header("Location: login.php");
+        } else {
+            $error = "Error: " . $conn->error;
+        }
     }
 }
 ?>
@@ -45,6 +53,27 @@ if(isset($_POST['signup'])){
                         <option value="faculty">Faculty</option>
                     </select>
                 </div>
+                <!-- Student profile fields -->
+                <div class="col-12 student-fields d-none">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Roll Number <span class="text-danger">*</span></label>
+                            <input type="text" name="roll_no" class="form-control" placeholder="CS21-001">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Course <span class="text-danger">*</span></label>
+                            <input type="text" name="course" class="form-control" placeholder="B.Tech">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Year <span class="text-muted">(optional)</span></label>
+                            <input type="number" min="1" max="5" name="year" class="form-control" placeholder="2">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Department <span class="text-muted">(optional)</span></label>
+                            <input type="text" name="department" class="form-control" placeholder="Computer Science">
+                        </div>
+                    </div>
+                </div>
                 <div class="col-12 d-grid">
                     <button type="submit" name="signup" class="btn btn-primary btn-lg">Sign Up</button>
                 </div>
@@ -54,3 +83,26 @@ if(isset($_POST['signup'])){
     </div>
 </div>
 <?php include('../includes/footer.php'); ?>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    const roleSelect = document.querySelector('select[name="role"]');
+    const studentFields = document.querySelector('.student-fields');
+    const toggleFields = () => {
+        if (roleSelect.value === 'student') {
+            studentFields.classList.remove('d-none');
+            // Make roll_no and course required when student
+            studentFields.querySelector('input[name="roll_no"]').required = true;
+            studentFields.querySelector('input[name="course"]').required = true;
+            // Year and department are optional
+            studentFields.querySelector('input[name="year"]').required = false;
+            studentFields.querySelector('input[name="department"]').required = false;
+        } else {
+            studentFields.classList.add('d-none');
+            studentFields.querySelectorAll('input').forEach(i => i.required = false);
+        }
+    };
+    roleSelect.addEventListener('change', toggleFields);
+    toggleFields();
+});
+</script>

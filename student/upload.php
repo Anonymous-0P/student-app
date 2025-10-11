@@ -12,11 +12,19 @@ $allowedMime = ['image/jpeg','image/png','image/gif'];
 $maxFileSize = 4 * 1024 * 1024; // 4MB per image
 $maxFiles = 15;
 
+// Get available subjects for dropdown
+$subjectsQuery = "SELECT id, code, name FROM subjects WHERE is_active=1 ORDER BY code";
+$subjectsResult = $conn->query($subjectsQuery);
+
 if(isset($_POST['upload'])){
     if(!verify_csrf_token($_POST['csrf_token'] ?? '')) {
         echo '<p>Invalid CSRF token.</p>';
     } else {
-        if(!isset($_FILES['images'])) {
+        $subject_id = isset($_POST['subject_id']) ? (int)$_POST['subject_id'] : null;
+        
+        if(empty($subject_id)) {
+            echo '<div class="alert alert-danger">Please select a subject.</div>';
+        } else if(!isset($_FILES['images'])) {
             echo '<p>No files uploaded.</p>';
         } else {
             $files = $_FILES['images'];
@@ -26,9 +34,14 @@ if(isset($_POST['upload'])){
             } else {
                 $pdf = new FPDF();
                 $allOk = true;
+                $totalFileSize = 0;
+                $originalFilenames = [];
+                
                 for($i=0; $i<$count; $i++) {
                     if($files['error'][$i] !== UPLOAD_ERR_OK) { $allOk = false; break; }
                     if($files['size'][$i] > $maxFileSize) { $allOk = false; echo '<p>File too large: '.sanitize($files['name'][$i]).'</p>'; break; }
+                    $totalFileSize += $files['size'][$i];
+                    $originalFilenames[] = $files['name'][$i];
                     $finfo = finfo_open(FILEINFO_MIME_TYPE);
                     $mime = finfo_file($finfo, $files['tmp_name'][$i]);
                     finfo_close($finfo);
@@ -78,9 +91,12 @@ if(isset($_POST['upload'])){
                     $pdfFile = dirname(__DIR__) . '/uploads/pdfs/' . $filename; // Absolute path for file system
                     $pdf->Output('F', $pdfFile);
 
-                    $stmt = $conn->prepare("INSERT INTO submissions (student_id, pdf_url) VALUES (?, ?)");
+                    // Prepare comprehensive submission data
+                    $originalFilenamesStr = implode(', ', $originalFilenames);
+                    
+                    $stmt = $conn->prepare("INSERT INTO submissions (student_id, subject_id, pdf_url, original_filename, file_size, status) VALUES (?, ?, ?, ?, ?, 'pending')");
                     $storePath = $pdfFileRelative; // store relative web path
-                    $stmt->bind_param("is", $_SESSION['user_id'], $storePath);
+                    $stmt->bind_param("iissi", $_SESSION['user_id'], $subject_id, $storePath, $originalFilenamesStr, $totalFileSize);
                     if($stmt->execute()) {
                         echo "<p>PDF uploaded successfully! <a href='view_submissions.php'>View Submissions</a></p>";
                     } else {
@@ -123,7 +139,18 @@ if(isset($_POST['upload'])){
             <form method="POST" enctype="multipart/form-data" class="vstack gap-3" id="upload-form">
                 <?php csrf_input(); ?>
                 <div>
-                    <label class="form-label">📁 Or Select Images from Device</label>
+                    <label class="form-label">� Select Subject <span class="text-danger">*</span></label>
+                    <select name="subject_id" class="form-select" required>
+                        <option value="">Choose a subject...</option>
+                        <?php while($subject = $subjectsResult->fetch_assoc()): ?>
+                            <option value="<?php echo (int)$subject['id']; ?>">
+                                <?php echo htmlspecialchars($subject['code'] . ' - ' . $subject['name']); ?>
+                            </option>
+                        <?php endwhile; ?>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">�📁 Or Select Images from Device</label>
                     <input type="file" name="images[]" multiple accept="image/*" class="form-control" capture="environment">
                     <small>Allowed: JPG, PNG, GIF. Max 4MB each. Max <?= $maxFiles; ?> images.</small>
                 </div>

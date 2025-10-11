@@ -2,11 +2,11 @@
 include('../config/config.php');
 
 if(isset($_POST['login'])){
-    $email = $_POST['email'];
+    $identifier = $_POST['identifier']; // email or roll
     $password = $_POST['password'];
 
-    $stmt = $conn->prepare("SELECT * FROM users WHERE email=?");
-    $stmt->bind_param("s", $email);
+    $stmt = $conn->prepare("SELECT * FROM users WHERE email=? OR roll_no=? LIMIT 1");
+    $stmt->bind_param("ss", $identifier, $identifier);
     $stmt->execute();
     $result = $stmt->get_result();
     if($result->num_rows == 1){
@@ -36,8 +36,8 @@ if(isset($_POST['login'])){
             <?php if(isset($error)) echo '<div class="alert alert-danger py-2">'.htmlspecialchars($error).'</div>'; ?>
             <form method="POST" class="vstack gap-3">
                 <div>
-                    <label class="form-label">Email</label>
-                    <input type="email" name="email" class="form-control" placeholder="you@example.com" required>
+                    <label class="form-label">Email or Roll No.</label>
+                    <input type="text" name="identifier" class="form-control" placeholder="you@example.com or CS21-001" required>
                 </div>
                 <div>
                     <label class="form-label">Password</label>
