@@ -54,8 +54,9 @@ try {
         "ALTER TABLE submissions ADD COLUMN subject_id INT NULL AFTER student_id",
         "ALTER TABLE submissions ADD COLUMN original_filename VARCHAR(255) NULL AFTER pdf_url",
         "ALTER TABLE submissions ADD COLUMN file_size INT NULL AFTER original_filename",
-        "ALTER TABLE submissions ADD COLUMN status ENUM('pending','evaluated','returned') DEFAULT 'pending' AFTER file_size",
-        "ALTER TABLE submissions ADD COLUMN marks DECIMAL(5,2) NULL AFTER status",
+        "ALTER TABLE submissions MODIFY COLUMN status ENUM('pending','approved','rejected','under_review') DEFAULT 'pending'",
+        "ALTER TABLE submissions ADD COLUMN admin_remarks TEXT NULL AFTER status",
+        "ALTER TABLE submissions ADD COLUMN marks DECIMAL(5,2) NULL AFTER admin_remarks",
         "ALTER TABLE submissions ADD COLUMN total_marks DECIMAL(5,2) NULL AFTER marks",
         "ALTER TABLE submissions ADD COLUMN evaluation_notes TEXT NULL AFTER total_marks",
         "ALTER TABLE submissions ADD COLUMN evaluated_at TIMESTAMP NULL AFTER evaluation_notes",
@@ -98,6 +99,48 @@ try {
             echo "   ⚠ Foreign key constraint already exists\n";
         } else {
             echo "   ⚠ Could not add foreign key: " . $e->getMessage() . "\n";
+        }
+    }
+    
+    // 1.7. Update user roles for admin system
+    echo "\n1.7. Updating user roles for admin system...\n";
+    try {
+        $conn->query("ALTER TABLE users MODIFY COLUMN role ENUM('student','evaluator','moderator','admin') NOT NULL");
+        echo "   ✓ Updated user roles to include evaluator, moderator, admin\n";
+    } catch (mysqli_sql_exception $e) {
+        echo "   ⚠ Could not update user roles: " . $e->getMessage() . "\n";
+    }
+    
+    // Add moderator assignment fields
+    $adminAlters = [
+        "ALTER TABLE users ADD COLUMN moderator_id INT NULL AFTER department",
+        "ALTER TABLE users ADD COLUMN is_active TINYINT(1) DEFAULT 1 AFTER moderator_id"
+    ];
+    
+    foreach ($adminAlters as $query) {
+        try {
+            $result = $conn->query($query);
+            if ($result) {
+                echo "   ✓ " . substr($query, 0, 60) . "...\n";
+            }
+        } catch (mysqli_sql_exception $e) {
+            if (strpos($e->getMessage(), 'Duplicate column name') !== false) {
+                echo "   ⚠ Column already exists: " . substr($query, 0, 60) . "...\n";
+            } else {
+                echo "   ⚠ Could not add column: " . $e->getMessage() . "\n";
+            }
+        }
+    }
+    
+    // Add moderator foreign key
+    try {
+        $conn->query("ALTER TABLE users ADD CONSTRAINT fk_user_moderator FOREIGN KEY (moderator_id) REFERENCES users(id) ON DELETE SET NULL");
+        echo "   ✓ Added moderator foreign key constraint\n";
+    } catch (mysqli_sql_exception $e) {
+        if (strpos($e->getMessage(), 'Duplicate') !== false) {
+            echo "   ⚠ Moderator foreign key constraint already exists\n";
+        } else {
+            echo "   ⚠ Could not add moderator foreign key: " . $e->getMessage() . "\n";
         }
     }
     
@@ -163,6 +206,47 @@ try {
         throw new Exception("Error creating questions table: " . $conn->error);
     }
     
+    // 4.5. Create subject assignments table for moderator-subject mapping
+    echo "\n4.5. Creating subject_assignments table...\n";
+    $assignmentsTable = "
+    CREATE TABLE IF NOT EXISTS subject_assignments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        moderator_id INT NOT NULL,
+        subject_id INT NOT NULL,
+        assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        is_active TINYINT(1) DEFAULT 1,
+        UNIQUE KEY unique_assignment (moderator_id, subject_id),
+        FOREIGN KEY (moderator_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
+    )";
+    
+    if ($conn->query($assignmentsTable)) {
+        echo "   ✓ Subject assignments table created successfully\n";
+    } else {
+        throw new Exception("Error creating subject_assignments table: " . $conn->error);
+    }
+    
+    // 4.6. Create evaluation assignments table for tracking evaluator workload
+    echo "\n4.6. Creating evaluation_assignments table...\n";
+    $evalAssignmentsTable = "
+    CREATE TABLE IF NOT EXISTS evaluation_assignments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        submission_id INT NOT NULL,
+        evaluator_id INT NOT NULL,
+        moderator_id INT NOT NULL,
+        assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        status ENUM('assigned','in_progress','completed') DEFAULT 'assigned',
+        FOREIGN KEY (submission_id) REFERENCES submissions(id) ON DELETE CASCADE,
+        FOREIGN KEY (evaluator_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (moderator_id) REFERENCES users(id) ON DELETE CASCADE
+    )";
+    
+    if ($conn->query($evalAssignmentsTable)) {
+        echo "   ✓ Evaluation assignments table created successfully\n";
+    } else {
+        throw new Exception("Error creating evaluation_assignments table: " . $conn->error);
+    }
+    
     // 5. Seed sample subjects
     echo "\n5. Inserting sample subjects...\n";
     $sampleSubjects = [
@@ -180,6 +264,33 @@ try {
         if ($stmt->execute()) {
             echo "   ✓ Added subject: {$subject[0]} - {$subject[1]}\n";
         }
+    }
+    
+    // 5.5. Create admin and management users
+    echo "\n5.5. Creating admin and management users...\n";
+    
+    // Check if admin exists
+    $adminCheck = $conn->query("SELECT id FROM users WHERE role = 'admin' LIMIT 1");
+    if ($adminCheck->num_rows == 0) {
+        $adminPassword = password_hash('admin123', PASSWORD_BCRYPT);
+        $stmt = $conn->prepare("INSERT INTO users (name, email, password, role, is_active) VALUES (?, ?, ?, ?, 1)");
+        
+        $adminUsers = [
+            ['System Administrator', 'admin@school.edu', $adminPassword, 'admin'],
+            ['Dr. Sarah Johnson', 'moderator1@school.edu', password_hash('mod123', PASSWORD_BCRYPT), 'moderator'],
+            ['Prof. Michael Chen', 'moderator2@school.edu', password_hash('mod123', PASSWORD_BCRYPT), 'moderator'],
+            ['Ms. Emily Davis', 'evaluator1@school.edu', password_hash('eval123', PASSWORD_BCRYPT), 'evaluator'],
+            ['Mr. Robert Wilson', 'evaluator2@school.edu', password_hash('eval123', PASSWORD_BCRYPT), 'evaluator']
+        ];
+        
+        foreach ($adminUsers as $user) {
+            $stmt->bind_param("ssss", $user[0], $user[1], $user[2], $user[3]);
+            if ($stmt->execute()) {
+                echo "   ✓ Created {$user[3]}: {$user[0]}\n";
+            }
+        }
+    } else {
+        echo "   ⚠ Admin users already exist\n";
     }
     
     // 6. Seed question templates

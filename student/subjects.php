@@ -8,12 +8,12 @@ checkLogin('student');
 $year = $_SESSION['year'] ?? null;
 $department = $_SESSION['department'] ?? null;
 
-$query = "SELECT s.*, qt.id AS template_id FROM subjects s LEFT JOIN question_templates qt ON qt.subject_id=s.id AND qt.is_active=1 WHERE s.is_active=1";
+$query = "SELECT s.*, MAX(qt.id) AS template_id FROM subjects s LEFT JOIN question_templates qt ON qt.subject_id=s.id AND qt.is_active=1 WHERE s.is_active=1";
 $params = [];
 $types = '';
 if ($year) { $query .= " AND (s.year IS NULL OR s.year=?)"; $types .= 'i'; $params[] = $year; }
 if ($department) { $query .= " AND (s.department IS NULL OR s.department=?)"; $types .= 's'; $params[] = $department; }
-$query .= " ORDER BY s.code";
+$query .= " GROUP BY s.id ORDER BY s.code";
 
 $stmt = $conn->prepare($query);
 if (!empty($params)) {

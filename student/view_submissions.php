@@ -11,8 +11,9 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'student'){
 $stmt = $conn->prepare("SELECT s.*, sub.code as subject_code, sub.name as subject_name, 
                        CASE 
                            WHEN s.status = 'pending' THEN 'Pending Review'
-                           WHEN s.status = 'evaluated' THEN 'Evaluated'
-                           WHEN s.status = 'returned' THEN 'Returned'
+                           WHEN s.status = 'approved' THEN 'Approved'
+                           WHEN s.status = 'rejected' THEN 'Rejected'
+                           WHEN s.status = 'under_review' THEN 'Under Review'
                            ELSE 'Unknown'
                        END as status_display
                        FROM submissions s 
@@ -57,14 +58,15 @@ $result = $stmt->get_result();
                             <?php 
                             // Fix PDF URL for proper access
                             $pdfUrl = $row['pdf_url'];
-                            if (strpos($pdfUrl, '/uploads/') === 0) {
-                                $pdfUrl = '..' . $pdfUrl;
+                            if($pdfUrl && !preg_match('#^https?://#', $pdfUrl)) {
+                                $pdfUrl = '..' . (strpos($pdfUrl, '/') === 0 ? $pdfUrl : '/' . $pdfUrl);
                             }
                             
                             // Status badge styling
                             $statusClass = 'bg-warning';
-                            if($row['status'] == 'evaluated') $statusClass = 'bg-success';
-                            if($row['status'] == 'returned') $statusClass = 'bg-info';
+                            if($row['status'] == 'approved') $statusClass = 'bg-success';
+                            if($row['status'] == 'rejected') $statusClass = 'bg-danger';
+                            if($row['status'] == 'under_review') $statusClass = 'bg-info';
                             
                             // File size formatting
                             $fileSize = '';

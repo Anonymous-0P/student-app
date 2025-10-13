@@ -14,10 +14,25 @@ if(isset($_POST['login'])){
         if(password_verify($password, $user['password'])){
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['role'] = $user['role'];
-            if($user['role'] == 'student'){
-                header("Location: ../student/dashboard.php");
-            } else {
-                header("Location: ../faculty/dashboard.php");
+            $_SESSION['name'] = $user['name'];
+            
+            // Redirect based on role (keep existing roles for existing users)
+            switch($user['role']) {
+                case 'student':
+                    header("Location: ../student/dashboard.php");
+                    break;
+                case 'evaluator':
+                    header("Location: ../evaluator/dashboard.php");
+                    break;
+                case 'moderator':
+                    header("Location: ../moderator/dashboard.php");
+                    break;
+                case 'admin':
+                    header("Location: ../admin/dashboard.php");
+                    break;
+                default:
+                    // Default to student dashboard for any unrecognized roles
+                    header("Location: ../student/dashboard.php");
             }
         } else {
             $error = "Incorrect password";
@@ -32,21 +47,24 @@ if(isset($_POST['login'])){
 <div class="row justify-content-center">
     <div class="col-md-6 col-lg-5">
         <div class="page-card">
-            <h2 class="mb-4">Login</h2>
+            <h2 class="mb-4">Student Login</h2>
             <?php if(isset($error)) echo '<div class="alert alert-danger py-2">'.htmlspecialchars($error).'</div>'; ?>
             <form method="POST" class="vstack gap-3">
                 <div>
-                    <label class="form-label">Email or Roll No.</label>
-                    <input type="text" name="identifier" class="form-control" placeholder="you@example.com or CS21-001" required>
+                    <label class="form-label">Email or Roll Number</label>
+                    <input type="text" name="identifier" class="form-control" placeholder="you@example.com or CS21-001" required value="<?= isset($_POST['identifier']) ? htmlspecialchars($_POST['identifier']) : '' ?>">
+                    <small class="text-muted">Enter your email address or roll number</small>
                 </div>
                 <div>
                     <label class="form-label">Password</label>
                     <input type="password" name="password" class="form-control" placeholder="••••••••" required>
                 </div>
                 <div class="d-grid">
-                    <button type="submit" name="login" class="btn btn-primary btn-lg">Login</button>
+                    <button type="submit" name="login" class="btn btn-primary btn-lg">Login to Dashboard</button>
                 </div>
-                <p class="mt-3 mb-0 small text-center">No account? <a href="signup.php">Sign up</a></p>
+                <p class="mt-3 mb-0 small text-center">
+                    Don't have a student account? <a href="signup.php" class="text-decoration-none">Sign up here</a>
+                </p>
             </form>
         </div>
     </div>

@@ -5,106 +5,91 @@ include('../includes/header.php');
 
 checkLogin('student');
 
-require('../vendor/fpdf/fpdf.php');
-
 // Configuration
-$allowedMime = ['image/jpeg','image/png','image/gif'];
-$maxFileSize = 4 * 1024 * 1024; // 4MB per image
 $maxFiles = 15;
+$allowedPdfMime = ['application/pdf'];
+$maxPdfSize = 25 * 1024 * 1024; // 25MB per submission
 
 // Get available subjects for dropdown
 $subjectsQuery = "SELECT id, code, name FROM subjects WHERE is_active=1 ORDER BY code";
 $subjectsResult = $conn->query($subjectsQuery);
 
-if(isset($_POST['upload'])){
-    if(!verify_csrf_token($_POST['csrf_token'] ?? '')) {
-        echo '<p>Invalid CSRF token.</p>';
-    } else {
-        $subject_id = isset($_POST['subject_id']) ? (int)$_POST['subject_id'] : null;
-        
-        if(empty($subject_id)) {
-            echo '<div class="alert alert-danger">Please select a subject.</div>';
-        } else if(!isset($_FILES['images'])) {
-            echo '<p>No files uploaded.</p>';
-        } else {
-            $files = $_FILES['images'];
-            $count = count($files['tmp_name']);
-            if ($count > $maxFiles) {
-                echo '<p>Too many files. Max ' . $maxFiles . ' allowed.</p>';
-            } else {
-                $pdf = new FPDF();
-                $allOk = true;
-                $totalFileSize = 0;
-                $originalFilenames = [];
-                
-                for($i=0; $i<$count; $i++) {
-                    if($files['error'][$i] !== UPLOAD_ERR_OK) { $allOk = false; break; }
-                    if($files['size'][$i] > $maxFileSize) { $allOk = false; echo '<p>File too large: '.sanitize($files['name'][$i]).'</p>'; break; }
-                    $totalFileSize += $files['size'][$i];
-                    $originalFilenames[] = $files['name'][$i];
-                    $finfo = finfo_open(FILEINFO_MIME_TYPE);
-                    $mime = finfo_file($finfo, $files['tmp_name'][$i]);
-                    finfo_close($finfo);
-                    if(!in_array($mime, $allowedMime)) { $allOk = false; echo '<p>Invalid file type: '.sanitize($files['name'][$i]).'</p>'; break; }
-                }
-                if($allOk) {
-                    for($i=0; $i<$count; $i++) {
-                        $tmpName = $files['tmp_name'][$i];
-                        $pdf->AddPage();
-                        
-                        // Get image info and determine type
-                        $imageInfo = getimagesize($tmpName);
-                        $width = $imageInfo[0];
-                        $height = $imageInfo[1];
-                        $mimeType = $imageInfo['mime'];
-                        
-                        // Determine FPDF image type from MIME type
-                        $fpdfType = '';
-                        switch($mimeType) {
-                            case 'image/jpeg':
-                                $fpdfType = 'JPG';
-                                break;
-                            case 'image/png':
-                                $fpdfType = 'PNG';
-                                break;
-                            case 'image/gif':
-                                $fpdfType = 'GIF';
-                                break;
-                            default:
-                                $fpdfType = 'JPG'; // fallback
-                        }
-                        
-                        // Fit image to page preserving aspect ratio
-                        $pageWidth = 190; // A4 width minus margins
-                        $pageHeight = 277; // A4 height minus margins
-                        $ratio = min($pageWidth/$width, $pageHeight/$height);
-                        $newW = $width * $ratio;
-                        $newH = $height * $ratio;
-                        $x = (210 - $newW)/2; // center on A4 (210mm width)
-                        $y = (297 - $newH)/2; // center on A4 height
-                        
-                        // Pass the image type explicitly to FPDF
-                        $pdf->Image($tmpName, $x, $y, $newW, $newH, $fpdfType);
-                    }
-                    $filename = time() . '_' . bin2hex(random_bytes(4)) . '.pdf';
-                    $pdfFileRelative = '../uploads/pdfs/' . $filename; // Relative path for web access
-                    $pdfFile = dirname(__DIR__) . '/uploads/pdfs/' . $filename; // Absolute path for file system
-                    $pdf->Output('F', $pdfFile);
-
-                    // Prepare comprehensive submission data
-                    $originalFilenamesStr = implode(', ', $originalFilenames);
-                    
-                    $stmt = $conn->prepare("INSERT INTO submissions (student_id, subject_id, pdf_url, original_filename, file_size, status) VALUES (?, ?, ?, ?, ?, 'pending')");
-                    $storePath = $pdfFileRelative; // store relative web path
-                    $stmt->bind_param("iissi", $_SESSION['user_id'], $subject_id, $storePath, $originalFilenamesStr, $totalFileSize);
-                    if($stmt->execute()) {
-                        echo "<p>PDF uploaded successfully! <a href='view_submissions.php'>View Submissions</a></p>";
-                    } else {
-                        echo '<p>Database error while saving submission.</p>';
-                    }
-                }
-            }
+if($_SERVER['REQUEST_METHOD'] === 'POST'){
+    $respond = function($status, $message, $extra = []) {
+        $payload = array_merge(['status' => $status, 'message' => $message], $extra);
+        if(isset($_POST['ajax']) && $_POST['ajax'] === '1') {
+            header('Content-Type: application/json');
+            echo json_encode($payload);
+            exit;
         }
+        // Fallback for non-AJAX submissions
+        if($status === 'success') {
+            echo '<div class="alert alert-success">' . htmlspecialchars($message) . '</div>';
+        } else {
+            echo '<div class="alert alert-danger">' . htmlspecialchars($message) . '</div>';
+        }
+    };
+
+    if(!verify_csrf_token($_POST['csrf_token'] ?? '')) {
+        $respond('error', 'Invalid CSRF token.');
+        return;
+    }
+
+    $subject_id = isset($_POST['subject_id']) ? (int)$_POST['subject_id'] : null;
+    if(empty($subject_id)) {
+        $respond('error', 'Please select a subject.');
+        return;
+    }
+
+    if(!isset($_FILES['pdf_file'])) {
+        $respond('error', 'No PDF received. Please try again.');
+        return;
+    }
+
+    $pdfFile = $_FILES['pdf_file'];
+    if($pdfFile['error'] !== UPLOAD_ERR_OK) {
+        $respond('error', 'Upload failed. Please try again.');
+        return;
+    }
+
+    if($pdfFile['size'] > $maxPdfSize) {
+        $respond('error', 'PDF is too large. Please keep submissions under 25MB.');
+        return;
+    }
+
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mime = finfo_file($finfo, $pdfFile['tmp_name']);
+    finfo_close($finfo);
+    if(!in_array($mime, $allowedPdfMime)) {
+        $respond('error', 'Only PDF files are allowed.');
+        return;
+    }
+
+    // Persist PDF
+    $filename = time() . '_' . bin2hex(random_bytes(6)) . '.pdf';
+    $relativePath = 'uploads/pdfs/' . $filename;
+    $storePath = dirname(__DIR__) . '/' . $relativePath;
+
+    if(!is_dir(dirname($storePath))) {
+        mkdir(dirname($storePath), 0775, true);
+    }
+
+    if(!move_uploaded_file($pdfFile['tmp_name'], $storePath)) {
+        $respond('error', 'Could not store uploaded PDF.');
+        return;
+    }
+
+    $originalNames = trim($_POST['original_names'] ?? '');
+    $stmt = $conn->prepare("INSERT INTO submissions (student_id, subject_id, pdf_url, original_filename, file_size, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', NOW())");
+    $fileSize = (int)$pdfFile['size'];
+    $stmt->bind_param("iissi", $_SESSION['user_id'], $subject_id, $relativePath, $originalNames, $fileSize);
+
+    if($stmt->execute()) {
+        $respond('success', 'Submission uploaded successfully!', ['redirect' => 'view_submissions.php']);
+        return;
+    } else {
+        $respond('error', 'Database error while saving submission.');
+        return;
     }
 }
 ?>
@@ -113,6 +98,7 @@ if(isset($_POST['upload'])){
     <div class="col-lg-9 col-xl-8">
         <div class="page-card">
             <h2 class="mb-3">Upload Answers</h2>
+            <div id="upload-status" class="mb-3"></div>
             
             <!-- Camera Capture Section -->
             <div class="mb-4">
@@ -138,6 +124,7 @@ if(isset($_POST['upload'])){
 
             <form method="POST" enctype="multipart/form-data" class="vstack gap-3" id="upload-form">
                 <?php csrf_input(); ?>
+                <input type="hidden" name="ajax" value="1">
                 <div>
                     <label class="form-label">� Select Subject <span class="text-danger">*</span></label>
                     <select name="subject_id" class="form-select" required>
@@ -150,9 +137,9 @@ if(isset($_POST['upload'])){
                     </select>
                 </div>
                 <div>
-                    <label class="form-label">�📁 Or Select Images from Device</label>
-                    <input type="file" name="images[]" multiple accept="image/*" class="form-control" capture="environment">
-                    <small>Allowed: JPG, PNG, GIF. Max 4MB each. Max <?= $maxFiles; ?> images.</small>
+                    <label class="form-label">�📁 Or Select Images / PDF from Device</label>
+                    <input type="file" name="device_files" multiple accept="image/*,application/pdf" class="form-control" capture="environment">
+                    <small>Allowed: JPG, PNG, GIF (will be merged into a PDF locally) or a single PDF. Max <?= $maxFiles; ?> images.</small>
                 </div>
                 <div class="d-flex gap-2">
                     <button type="submit" name="upload" class="btn btn-primary">Upload & Convert to PDF</button>
@@ -163,8 +150,10 @@ if(isset($_POST['upload'])){
     </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const MAX_FILES = <?php echo (int) $maxFiles; ?>;
     const video = document.getElementById('camera-preview');
     const canvas = document.getElementById('photo-canvas');
     const startBtn = document.getElementById('start-camera');
@@ -172,52 +161,96 @@ document.addEventListener('DOMContentLoaded', function() {
     const stopBtn = document.getElementById('stop-camera');
     const capturedPhotos = document.getElementById('captured-photos');
     const uploadForm = document.getElementById('upload-form');
-    const fileInput = uploadForm.querySelector('input[type="file"]');
-    
+    const fileInput = uploadForm.querySelector('input[name="device_files"]');
+    const subjectSelect = uploadForm.querySelector('select[name="subject_id"]');
+    const submitBtn = uploadForm.querySelector('button[type="submit"]');
+    const uploadStatus = document.getElementById('upload-status');
+
     let stream = null;
     let capturedFiles = [];
+
+    const setStatus = (type, message) => {
+        if (!uploadStatus) return;
+        uploadStatus.innerHTML = `<div class="alert alert-${type} mb-0">${message}</div>`;
+    };
+
+    const clearStatus = () => {
+        if (uploadStatus) uploadStatus.innerHTML = '';
+    };
+
+    const getSelectedImageCount = () => Array.from(fileInput.files || []).filter(file => file.type.startsWith('image/')).length;
+    const getSelectedPdfCount = () => Array.from(fileInput.files || []).filter(file => file.type === 'application/pdf').length;
+
+    const readFileAsDataURL = (file) => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+    });
+
+    const loadImageElement = (src) => new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+    });
+
+    const resetFormState = () => {
+        capturedFiles = [];
+        capturedPhotos.innerHTML = '';
+        fileInput.value = '';
+    };
 
     // Start camera
     startBtn.addEventListener('click', async () => {
         try {
-            stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { 
-                    facingMode: 'environment' // Use back camera on mobile
-                } 
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: 'environment'
+                }
             });
             video.srcObject = stream;
             video.style.display = 'block';
             video.play();
-            
+
             startBtn.style.display = 'none';
             takePhotoBtn.style.display = 'inline-block';
             stopBtn.style.display = 'inline-block';
+            clearStatus();
         } catch (err) {
-            alert('Error accessing camera: ' + err.message);
+            setStatus('danger', 'Error accessing camera: ' + err.message);
         }
     });
 
     // Take photo
     takePhotoBtn.addEventListener('click', () => {
+        if ((capturedFiles.length + getSelectedImageCount()) >= MAX_FILES) {
+            setStatus('danger', `You can upload up to ${MAX_FILES} images in one submission.`);
+            return;
+        }
+
         const context = canvas.getContext('2d');
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         context.drawImage(video, 0, 0);
-        
-        // Convert canvas to blob
+
         canvas.toBlob((blob) => {
+            if (!blob) {
+                setStatus('danger', 'Could not capture photo. Please try again.');
+                return;
+            }
+
             const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
             capturedFiles.push(file);
-            
-            // Create preview
+
             const preview = document.createElement('div');
             preview.className = 'captured-photo position-relative';
             preview.style.cssText = 'width: 100px; height: 80px; border: 1px solid #dee2e6; border-radius: 4px; overflow: hidden;';
-            
+
             const img = document.createElement('img');
             img.src = URL.createObjectURL(blob);
             img.style.cssText = 'width: 100%; height: 100%; object-fit: cover;';
-            
+
             const deleteBtn = document.createElement('button');
             deleteBtn.innerHTML = '×';
             deleteBtn.className = 'btn btn-sm btn-danger position-absolute top-0 end-0';
@@ -227,11 +260,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (index > -1) capturedFiles.splice(index, 1);
                 preview.remove();
             };
-            
+
             preview.appendChild(img);
             preview.appendChild(deleteBtn);
             capturedPhotos.appendChild(preview);
-        }, 'image/jpeg', 0.8);
+        }, 'image/jpeg', 0.85);
     });
 
     // Stop camera
@@ -246,24 +279,153 @@ document.addEventListener('DOMContentLoaded', function() {
         stopBtn.style.display = 'none';
     });
 
+    // Validate file selection limits
+    fileInput.addEventListener('change', () => {
+        clearStatus();
+        const imageCount = getSelectedImageCount();
+        const pdfCount = getSelectedPdfCount();
+
+        if (pdfCount > 1) {
+            setStatus('danger', 'Please choose only one PDF file.');
+            fileInput.value = '';
+            return;
+        }
+
+        if (pdfCount === 1 && (imageCount > 0 || capturedFiles.length > 0)) {
+            setStatus('danger', 'Please upload either images or a PDF, not both.');
+            fileInput.value = '';
+            return;
+        }
+
+        if ((imageCount + capturedFiles.length) > MAX_FILES) {
+            setStatus('danger', `You can upload up to ${MAX_FILES} images (including captured photos).`);
+            fileInput.value = '';
+        }
+    });
+
     // Handle form submission
-    uploadForm.addEventListener('submit', (e) => {
-        if (capturedFiles.length > 0) {
-            // Create new FormData and add captured photos
-            const dt = new DataTransfer();
-            
-            // Add captured photos
-            capturedFiles.forEach(file => {
-                dt.items.add(file);
+    uploadForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        clearStatus();
+
+        if (!subjectSelect.value) {
+            setStatus('danger', 'Please select a subject.');
+            return;
+        }
+
+        const selectedFiles = Array.from(fileInput.files || []);
+        const pdfFiles = selectedFiles.filter(file => file.type === 'application/pdf');
+        const imageFiles = selectedFiles.filter(file => file.type.startsWith('image/'));
+        const totalImageCount = imageFiles.length + capturedFiles.length;
+
+        if (totalImageCount === 0 && pdfFiles.length === 0) {
+            setStatus('danger', 'Please capture or select answer sheet images, or upload a PDF.');
+            return;
+        }
+
+        if (pdfFiles.length === 1 && totalImageCount > 0) {
+            setStatus('danger', 'Please upload either images or a PDF, not both.');
+            return;
+        }
+
+        if (totalImageCount > MAX_FILES) {
+            setStatus('danger', `You can upload up to ${MAX_FILES} images in one submission.`);
+            return;
+        }
+
+        const csrfToken = uploadForm.querySelector('input[name="csrf_token"]').value;
+        let pdfBlob;
+        let pdfFileName = `answers_${Date.now()}.pdf`;
+        let originalNames = [];
+
+        try {
+            if (totalImageCount > 0) {
+                if (!window.jspdf || !window.jspdf.jsPDF) {
+                    setStatus('danger', 'PDF library failed to load. Please refresh and try again.');
+                    return;
+                }
+
+                setStatus('info', 'Generating PDF from images...');
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+                const pageWidth = pdf.internal.pageSize.getWidth();
+                const pageHeight = pdf.internal.pageSize.getHeight();
+                const margin = 10;
+                const maxWidth = pageWidth - margin * 2;
+                const maxHeight = pageHeight - margin * 2;
+                let firstPage = true;
+                const orderedFiles = [...capturedFiles, ...imageFiles];
+
+                originalNames = orderedFiles.map(file => file.name);
+
+                for (const file of orderedFiles) {
+                    const dataUrl = await readFileAsDataURL(file);
+                    const imgElement = await loadImageElement(dataUrl);
+
+                    const widthRatio = maxWidth / imgElement.width;
+                    const heightRatio = maxHeight / imgElement.height;
+                    const ratio = Math.min(widthRatio, heightRatio, 1);
+                    const renderWidth = imgElement.width * ratio;
+                    const renderHeight = imgElement.height * ratio;
+                    const x = (pageWidth - renderWidth) / 2;
+                    const y = (pageHeight - renderHeight) / 2;
+                    const imageType = file.type.includes('png') ? 'PNG' : 'JPEG';
+
+                    if (!firstPage) {
+                        pdf.addPage();
+                    }
+                    firstPage = false;
+
+                    pdf.addImage(dataUrl, imageType, x, y, renderWidth, renderHeight);
+                }
+
+                pdfBlob = pdf.output('blob');
+            } else if (pdfFiles.length === 1) {
+                pdfBlob = pdfFiles[0];
+                pdfFileName = pdfFiles[0].name || pdfFileName;
+                originalNames = [pdfFileName];
+            }
+        } catch (error) {
+            console.error(error);
+            setStatus('danger', 'Failed to generate PDF. Please try again.');
+            return;
+        }
+
+        setStatus('info', 'Uploading, please wait...');
+        submitBtn.disabled = true;
+
+        const formData = new FormData();
+        formData.append('csrf_token', csrfToken);
+        formData.append('ajax', '1');
+        formData.append('subject_id', subjectSelect.value);
+        formData.append('original_names', originalNames.join(', '));
+
+        const pdfFileToSend = pdfBlob instanceof File ? pdfBlob : new File([pdfBlob], pdfFileName, { type: 'application/pdf' });
+        formData.append('pdf_file', pdfFileToSend);
+
+        try {
+            const response = await fetch('upload.php', {
+                method: 'POST',
+                body: formData
             });
-            
-            // Add selected files
-            Array.from(fileInput.files).forEach(file => {
-                dt.items.add(file);
-            });
-            
-            // Update file input
-            fileInput.files = dt.files;
+
+            const result = await response.json();
+            if (result.status === 'success') {
+                setStatus('success', result.message || 'Uploaded successfully.');
+                resetFormState();
+                if (result.redirect) {
+                    setTimeout(() => {
+                        window.location.href = result.redirect;
+                    }, 1200);
+                }
+            } else {
+                setStatus('danger', result.message || 'Upload failed. Please try again.');
+            }
+        } catch (error) {
+            console.error(error);
+            setStatus('danger', 'Unexpected error while uploading.');
+        } finally {
+            submitBtn.disabled = false;
         }
     });
 });

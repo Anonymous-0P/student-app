@@ -357,16 +357,16 @@
 <!-- Hero Section -->
 <section class="hero">
     <div class="hero-content">
-        <h1>Welcome to <span class="highlight">Student Photo Upload</span></h1>
-        <p>Seamlessly upload answer sheets as images, automatically convert them to PDFs, and enable faculty to review with ease. Modern education, simplified.</p>
+        <h1>Welcome to <span class="highlight">Student Upload Portal</span></h1>
+        <p>Upload your answer sheets as images with automatic PDF conversion. Submit assignments digitally and track your academic progress with ease.</p>
         
         <?php if(!isset($_SESSION['user_id'])): ?>
             <div class="cta-buttons">
                 <a href="auth/signup.php" class="btn btn-primary">
-                    📝 Get Started Free
+                    📝 Create Student Account
                 </a>
                 <a href="auth/login.php" class="btn btn-secondary">
-                    🔐 Login
+                    🔐 Student Login
                 </a>
             </div>
         <?php else: ?>
@@ -375,9 +375,17 @@
                     <a href="student/dashboard.php" class="btn btn-primary">
                         📚 Go to Dashboard
                     </a>
-                <?php else: ?>
-                    <a href="faculty/dashboard.php" class="btn btn-primary">
-                        👨‍🏫 Go to Dashboard
+                <?php elseif($_SESSION['role'] == 'admin'): ?>
+                    <a href="admin/dashboard.php" class="btn btn-primary">
+                        🛠️ Admin Panel
+                    </a>
+                <?php elseif($_SESSION['role'] == 'moderator'): ?>
+                    <a href="moderator/dashboard.php" class="btn btn-primary">
+                        👨‍💼 Moderator Panel
+                    </a>
+                <?php elseif($_SESSION['role'] == 'evaluator'): ?>
+                    <a href="evaluator/dashboard.php" class="btn btn-primary">
+                        👨‍🏫 Evaluator Panel
                     </a>
                 <?php endif; ?>
             </div>
@@ -389,8 +397,8 @@
 <!-- Features Section -->
 <section class="features">
     <div class="features-container">
-        <h2 class="section-title">Why Choose Us?</h2>
-        <p class="section-subtitle">Experience the easiest way to manage and review student submissions digitally</p>
+        <h2 class="section-title">Perfect for Students</h2>
+        <p class="section-subtitle">Experience the easiest way to submit assignments and track your academic progress digitally</p>
         
         <div class="features-grid">
             <div class="feature-card">
@@ -407,8 +415,8 @@
             
             <div class="feature-card">
                 <div class="feature-icon">👁️</div>
-                <h3>Faculty Review</h3>
-                <p>Instructors can efficiently review, annotate, and grade submissions from any device.</p>
+                <h3>Track Progress</h3>
+                <p>Monitor your submission status, view grades, and receive feedback from instructors in real-time.</p>
             </div>
             
             <div class="feature-card">
@@ -442,8 +450,8 @@
             <div class="step">
                 <div class="step-number">1</div>
                 <div class="step-content">
-                    <h3>Create Your Account</h3>
-                    <p>Sign up as a student or faculty member in seconds. No complicated setup required.</p>
+                    <h3>Create Student Account</h3>
+                    <p>Sign up as a student in seconds. Provide your roll number, course details, and get instant access.</p>
                 </div>
             </div>
             
@@ -469,24 +477,24 @@
 <!-- CTA Section -->
 <section class="cta-section">
     <div class="cta-content">
-        <h2>Ready to Get Started?</h2>
-        <p>Join thousands of students and faculty members who are already transforming their education experience.</p>
+        <h2>Ready to Start Submitting?</h2>
+        <p>Join thousands of students who are already transforming their academic submission experience with our platform.</p>
         
         <?php if(!isset($_SESSION['user_id'])): ?>
             <div class="cta-buttons">
                 <a href="auth/signup.php" class="btn btn-primary">
-                    Create Account Now
+                    Create Student Account Now
                 </a>
             </div>
         <?php else: ?>
             <div class="cta-buttons">
                 <?php if($_SESSION['role'] == 'student'): ?>
                     <a href="student/dashboard.php" class="btn btn-primary">
-                        Upload Your First Submission
+                        Upload Your First Assignment
                     </a>
                 <?php else: ?>
-                    <a href="faculty/dashboard.php" class="btn btn-primary">
-                        Start Reviewing Submissions
+                    <a href="admin/dashboard.php" class="btn btn-primary">
+                        Access Admin Panel
                     </a>
                 <?php endif; ?>
             </div>
