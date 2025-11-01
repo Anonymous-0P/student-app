@@ -1,4 +1,10 @@
 <?php
+
+// DEBUG: Enable error reporting for troubleshooting
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 require_once('../config/config.php');
 require_once('../includes/functions.php');
 include('../includes/header.php');
@@ -6,13 +12,22 @@ include('../includes/header.php');
 checkLogin('student');
 
 // Configuration
+$selectedSubjectId = isset($_GET['subject_id']) ? (int)$_GET['subject_id'] : 0;
 $maxFiles = 15;
 $allowedPdfMime = ['application/pdf'];
 $maxPdfSize = 25 * 1024 * 1024; // 25MB per submission
 
-// Get available subjects for dropdown
-$subjectsQuery = "SELECT id, code, name FROM subjects WHERE is_active=1 ORDER BY code";
-$subjectsResult = $conn->query($subjectsQuery);
+// Get available subjects for dropdown - only purchased subjects
+$subjectsQuery = "SELECT s.id, s.code, s.name, ps.expiry_date,
+                  DATEDIFF(ps.expiry_date, CURDATE()) as days_remaining
+                  FROM subjects s
+                  JOIN purchased_subjects ps ON s.id = ps.subject_id
+                  WHERE s.is_active = 1 AND ps.student_id = ? AND ps.status = 'active' AND ps.expiry_date > CURDATE()
+                  ORDER BY s.code";
+$subjectsStmt = $conn->prepare($subjectsQuery);
+$subjectsStmt->bind_param("i", $_SESSION['user_id']);
+$subjectsStmt->execute();
+$subjectsResult = $subjectsStmt->get_result();
 
 if($_SERVER['REQUEST_METHOD'] === 'POST'){
     $respond = function($status, $message, $extra = []) {
@@ -38,6 +53,17 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
     $subject_id = isset($_POST['subject_id']) ? (int)$_POST['subject_id'] : null;
     if(empty($subject_id)) {
         $respond('error', 'Please select a subject.');
+        return;
+    }
+
+    // Check if student has purchased access to this subject
+    $access_check = $conn->prepare("SELECT COUNT(*) as has_access FROM purchased_subjects WHERE student_id = ? AND subject_id = ? AND status = 'active' AND expiry_date > CURDATE()");
+    $access_check->bind_param("ii", $_SESSION['user_id'], $subject_id);
+    $access_check->execute();
+    $access_result = $access_check->get_result()->fetch_assoc();
+    
+    if ($access_result['has_access'] == 0) {
+        $respond('error', 'Access denied. You need to purchase this subject before uploading answer sheets.');
         return;
     }
 
@@ -80,15 +106,65 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
     }
 
     $originalNames = trim($_POST['original_names'] ?? '');
-    $stmt = $conn->prepare("INSERT INTO submissions (student_id, subject_id, pdf_url, original_filename, file_size, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', NOW())");
-    $fileSize = (int)$pdfFile['size'];
-    $stmt->bind_param("iissi", $_SESSION['user_id'], $subject_id, $relativePath, $originalNames, $fileSize);
-
-    if($stmt->execute()) {
-        $respond('success', 'Submission uploaded successfully!', ['redirect' => 'view_submissions.php']);
+    
+    // Start transaction for submission and assignment creation
+    $conn->begin_transaction();
+    
+    try {
+        // Insert submission
+        $stmt = $conn->prepare("INSERT INTO submissions (student_id, subject_id, pdf_url, original_filename, file_size, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', NOW())");
+        $fileSize = (int)$pdfFile['size'];
+        $stmt->bind_param("iissi", $_SESSION['user_id'], $subject_id, $relativePath, $originalNames, $fileSize);
+        
+        if(!$stmt->execute()) {
+            throw new Exception('Failed to insert submission');
+        }
+        
+        $submission_id = $conn->insert_id;
+        
+        // Get all evaluators assigned to this subject
+        $evaluatorStmt = $conn->prepare("
+            SELECT DISTINCT u.id, u.name, u.email 
+            FROM users u 
+            INNER JOIN evaluator_subjects es ON u.id = es.evaluator_id 
+            WHERE es.subject_id = ? AND u.role = 'evaluator' AND u.is_active = 1
+        ");
+        $evaluatorStmt->bind_param("i", $subject_id);
+        $evaluatorStmt->execute();
+        $evaluators = $evaluatorStmt->get_result();
+        
+        if($evaluators->num_rows == 0) {
+            throw new Exception('No evaluators found for this subject');
+        }
+        
+        // Create assignment records for all evaluators
+        $assignStmt = $conn->prepare("INSERT INTO submission_assignments (submission_id, evaluator_id, status, assigned_at) VALUES (?, ?, 'pending', NOW())");
+        $notifyStmt = $conn->prepare("INSERT INTO notifications (user_id, type, title, message, related_id, created_at) VALUES (?, 'assignment_offered', ?, ?, ?, NOW())");
+        
+        while($evaluator = $evaluators->fetch_assoc()) {
+            // Create assignment record
+            $assignStmt->bind_param("ii", $submission_id, $evaluator['id']);
+            if(!$assignStmt->execute()) {
+                throw new Exception('Failed to create assignment for evaluator ' . $evaluator['name']);
+            }
+            
+            // Create notification
+            $notifyTitle = "New Assignment Available";
+            $notifyMessage = "A new submission is available for evaluation. Please review and accept/deny the assignment.";
+            $notifyStmt->bind_param("issi", $evaluator['id'], $notifyTitle, $notifyMessage, $submission_id);
+            $notifyStmt->execute(); // Don't fail on notification errors
+        }
+        
+        // Commit transaction
+        $conn->commit();
+        
+        $respond('success', 'Submission uploaded successfully and assigned to evaluators!', ['redirect' => 'view_submissions.php']);
         return;
-    } else {
-        $respond('error', 'Database error while saving submission.');
+        
+    } catch (Exception $e) {
+        // Rollback transaction on error
+        $conn->rollback();
+        $respond('error', 'Error: ' . $e->getMessage());
         return;
     }
 }
@@ -102,16 +178,16 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
             
             <!-- Camera Capture Section -->
             <div class="mb-4">
-                <h5 class="mb-3">📸 Take Photos with Camera</h5>
+                <h5 class="mb-3">📸 Capture and Upload Answersheet</h5>
                 <div class="camera-section">
                     <video id="camera-preview" class="mb-3" style="width: 100%; max-width: 400px; height: 300px; background: #f8f9fa; border: 2px dashed #dee2e6; border-radius: 8px; display: none;"></video>
                     <canvas id="photo-canvas" style="display: none;"></canvas>
                     <div class="camera-controls mb-3">
                         <button type="button" id="start-camera" class="btn btn-outline-primary me-2">
-                            📷 Start Camera
+                            📷 Open Camera
                         </button>
                         <button type="button" id="take-photo" class="btn btn-success me-2" style="display: none;">
-                            📸 Capture Photo
+                            📸 Scan Answers
                         </button>
                         <button type="button" id="stop-camera" class="btn btn-outline-secondary" style="display: none;">
                             ⏹️ Stop Camera
@@ -126,15 +202,36 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
                 <?php csrf_input(); ?>
                 <input type="hidden" name="ajax" value="1">
                 <div>
-                    <label class="form-label">� Select Subject <span class="text-danger">*</span></label>
+                    <label class="form-label">Select Subject <span class="text-danger">*</span></label>
                     <select name="subject_id" class="form-select" required>
                         <option value="">Choose a subject...</option>
-                        <?php while($subject = $subjectsResult->fetch_assoc()): ?>
-                            <option value="<?php echo (int)$subject['id']; ?>">
-                                <?php echo htmlspecialchars($subject['code'] . ' - ' . $subject['name']); ?>
-                            </option>
-                        <?php endwhile; ?>
+                        <?php if ($subjectsResult->num_rows > 0): ?>
+                            <?php while($subject = $subjectsResult->fetch_assoc()): ?>
+                                <option value="<?php echo (int)$subject['id']; ?>" <?php echo ($selectedSubjectId === (int)$subject['id']) ? 'selected' : ''; ?>>
+                                    <?php 
+                                    $subject_text = htmlspecialchars($subject['code'] . ' - ' . $subject['name']);
+                                    if ($subject['days_remaining'] <= 7) {
+                                        $subject_text .= ' (Expires in ' . $subject['days_remaining'] . ' days)';
+                                    }
+                                    echo $subject_text;
+                                    ?>
+                                </option>
+                            <?php endwhile; ?>
+                        <?php endif; ?>
                     </select>
+                    
+                    <?php if ($subjectsResult->num_rows == 0): ?>
+                        <div class="alert alert-warning mt-2">
+                            <i class="fas fa-exclamation-triangle"></i> 
+                            <strong>No Purchased Subjects Available!</strong><br>
+                            You need to purchase subjects before you can upload answer sheets.<br>
+                            <a href="browse_exams.php" class="btn btn-sm btn-primary mt-2">
+                                <i class="fas fa-shopping-cart"></i> Browse & Purchase Subjects
+                            </a>
+                        </div>
+                    <?php else: ?>
+                        <small class="text-muted">Only your purchased subjects are shown here.</small>
+                    <?php endif; ?>
                 </div>
                 <div>
                     <label class="form-label">�📁 Or Select Images / PDF from Device</label>
@@ -142,7 +239,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
                     <small>Allowed: JPG, PNG, GIF (will be merged into a PDF locally) or a single PDF. Max <?= $maxFiles; ?> images.</small>
                 </div>
                 <div class="d-flex gap-2">
-                    <button type="submit" name="upload" class="btn btn-primary">Upload & Convert to PDF</button>
+                    <button type="submit" name="upload" class="btn btn-primary">Upload Answersheet</button>
                     <a href="view_submissions.php" class="btn btn-outline-secondary">View Submissions</a>
                 </div>
             </form>
@@ -150,9 +247,43 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
     </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://unpkg.com/jspdf@latest/dist/jspdf.umd.min.js"></script>
+<script>
+// Fallback CDN if first one fails
+window.addEventListener('load', function() {
+    if (typeof window.jspdf === 'undefined' && typeof window.jsPDF === 'undefined') {
+        console.log('Primary jsPDF CDN failed, trying fallback...');
+        const fallbackScript = document.createElement('script');
+        fallbackScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+        fallbackScript.onerror = function() {
+            console.error('Both jsPDF CDNs failed to load');
+        };
+        document.head.appendChild(fallbackScript);
+    }
+});
+</script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Check if jsPDF is available
+    const checkPDFLibrary = () => {
+        return typeof window.jspdf !== 'undefined' || typeof window.jsPDF !== 'undefined';
+    };
+    
+    // Wait for library to load if not immediately available
+    if (!checkPDFLibrary()) {
+        let attempts = 0;
+        const maxAttempts = 20; // Wait up to 2 seconds
+        const checkInterval = setInterval(() => {
+            attempts++;
+            if (checkPDFLibrary() || attempts >= maxAttempts) {
+                clearInterval(checkInterval);
+                if (!checkPDFLibrary()) {
+                    console.error('jsPDF library failed to load');
+                }
+            }
+        }, 100);
+    }
+
     const MAX_FILES = <?php echo (int) $maxFiles; ?>;
     const video = document.getElementById('camera-preview');
     const canvas = document.getElementById('photo-canvas');
@@ -340,13 +471,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
         try {
             if (totalImageCount > 0) {
-                if (!window.jspdf || !window.jspdf.jsPDF) {
-                    setStatus('danger', 'PDF library failed to load. Please refresh and try again.');
+                // Check for jsPDF availability
+                let jsPDF;
+                if (window.jspdf && window.jspdf.jsPDF) {
+                    jsPDF = window.jspdf.jsPDF;
+                } else if (window.jsPDF) {
+                    jsPDF = window.jsPDF;
+                } else {
+                    setStatus('danger', 'PDF library failed to load. Please refresh the page and try again.');
                     return;
                 }
 
                 setStatus('info', 'Generating PDF from images...');
-                const { jsPDF } = window.jspdf;
+                
                 const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
                 const pageWidth = pdf.internal.pageSize.getWidth();
                 const pageHeight = pdf.internal.pageSize.getHeight();

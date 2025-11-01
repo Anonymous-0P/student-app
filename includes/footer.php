@@ -4,7 +4,7 @@
     <div class="container">
         <div class="row align-items-center">
             <div class="col-md-6">
-                <p class="mb-0 text-muted">&copy; <?= date('Y') ?> Student Photo App. All rights reserved.</p>
+                <p class="mb-0 text-muted">&copy; <?= date('Y') ?> ThetaExams. All rights reserved.</p>
             </div>
             <div class="col-md-6 text-md-end">
                 <small class="text-muted">

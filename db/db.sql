@@ -2,18 +2,22 @@
 CREATE DATABASE IF NOT EXISTS student_photo_app;
 USE student_photo_app;
 
--- Users table (extended with student profile fields)
+-- Users table (extended with student profile fields and user management)
 CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
   email VARCHAR(100) UNIQUE NOT NULL,
   roll_no VARCHAR(50) UNIQUE NULL,
   password VARCHAR(255) NOT NULL,
-  role ENUM('student','faculty') NOT NULL,
+  role ENUM('student','faculty','moderator','evaluator','admin') NOT NULL,
   course VARCHAR(100) NULL,
   year INT NULL,
   department VARCHAR(100) NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  phone VARCHAR(20) NULL,
+  is_active TINYINT(1) DEFAULT 1,
+  moderator_id INT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (moderator_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- Submissions table
@@ -78,3 +82,34 @@ UNION ALL SELECT s.id, 'What is the difference between array and linked list?', 
 UNION ALL SELECT s.id, 'Describe how a binary search works and its time complexity.', 'medium', 10, 1 FROM subjects s WHERE s.code='CS201'
 UNION ALL SELECT s.id, 'Explain the working of Quick Sort and analyze its best, average, and worst-case complexities.', 'medium', 10, 1 FROM subjects s WHERE s.code='CS201'
 UNION ALL SELECT s.id, 'Design a data structure to implement an LRU cache and explain operations with complexities.', 'hard', 20, 1 FROM subjects s WHERE s.code='CS201';
+
+-- Moderator Subjects Assignment table
+CREATE TABLE IF NOT EXISTS moderator_subjects (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    moderator_id INT NOT NULL,
+    subject_id INT NOT NULL,
+    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (moderator_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_moderator_subject (moderator_id, subject_id)
+);
+
+-- Moderator Specializations table
+CREATE TABLE IF NOT EXISTS moderator_specializations (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    moderator_id INT NOT NULL,
+    specialization VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (moderator_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Evaluator Subjects Assignment table
+CREATE TABLE IF NOT EXISTS evaluator_subjects (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    evaluator_id INT NOT NULL,
+    subject_id INT NOT NULL,
+    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (evaluator_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_evaluator_subject (evaluator_id, subject_id)
+);

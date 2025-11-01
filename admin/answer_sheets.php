@@ -220,16 +220,9 @@ $recentActivity = $conn->query("
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <h1 class="h3 mb-2">Answer Sheet Management</h1>
-                    <p class="text-muted mb-0">Review, verify, and manage student submissions</p>
+                    <!-- <p class="text-muted mb-0">Review, verify, and manage student submissions</p> -->
                 </div>
-                <div class="d-flex gap-2">
-                    <button class="btn btn-success" onclick="bulkAction('approve')" id="bulkApproveBtn" disabled>
-                        ✅ Bulk Approve
-                    </button>
-                    <button class="btn btn-danger" onclick="bulkAction('reject')" id="bulkRejectBtn" disabled>
-                        ❌ Bulk Reject
-                    </button>
-                </div>
+                
             </div>
         </div>
     </div>
@@ -249,7 +242,7 @@ $recentActivity = $conn->query("
     <?php endif; ?>
 
     <!-- Statistics -->
-    <div class="row g-3 mb-4 fade-in">
+    <!-- <div class="row g-3 mb-4 fade-in">
         <div class="col-md-3">
             <div class="stat-card">
                 <div class="h4 mb-1"><?= $statusCounts['pending'] ?? 0 ?></div>
@@ -274,7 +267,7 @@ $recentActivity = $conn->query("
                 <div>Under Review</div>
             </div>
         </div>
-    </div>
+    </div> -->
 
     <div class="row">
         <!-- Main Content -->
@@ -282,16 +275,7 @@ $recentActivity = $conn->query("
             <!-- Filters -->
             <div class="answer-card fade-in">
                 <form method="GET" class="row g-3">
-                    <div class="col-md-3">
-                        <label class="form-label">Status</label>
-                        <select name="status" class="form-select">
-                            <option value="">All Status</option>
-                            <option value="pending" <?= $status_filter == 'pending' ? 'selected' : '' ?>>Pending</option>
-                            <option value="approved" <?= $status_filter == 'approved' ? 'selected' : '' ?>>Approved</option>
-                            <option value="rejected" <?= $status_filter == 'rejected' ? 'selected' : '' ?>>Rejected</option>
-                            <option value="under_review" <?= $status_filter == 'under_review' ? 'selected' : '' ?>>Under Review</option>
-                        </select>
-                    </div>
+                    
                     <div class="col-md-3">
                         <label class="form-label">Subject</label>
                         <select name="subject" class="form-select">
@@ -345,10 +329,7 @@ $recentActivity = $conn->query("
                                         <th width="40"></th>
                                         <th>Student</th>
                                         <th>Subject</th>
-                                        <th>File</th>
-                                        <th>Status</th>
-                                        <th>Uploaded</th>
-                                        <th>Actions</th>
+                                        <th>Submition Time</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -364,47 +345,15 @@ $recentActivity = $conn->query("
                                         <td>
                                             <div class="fw-semibold"><?= htmlspecialchars($submission['subject_name']) ?></div>
                                             <div class="small text-muted"><?= htmlspecialchars($submission['subject_code']) ?></div>
+                                        
+                                            
                                         </td>
-                                        <?php
-                                            $displayName = $submission['original_filename'] ?? ($submission['pdf_url'] ?? 'Submission #' . $submission['id']);
-                                            $displayName = $displayName ?: 'Submission #' . $submission['id'];
-                                            if (strpos($displayName, '/') !== false || strpos($displayName, "\\") !== false) {
-                                                $displayName = basename($displayName);
-                                            }
-                                            $pdfUrl = $submission['pdf_url'] ?? ($submission['pdf_path'] ?? '');
-                                            if ($pdfUrl && !preg_match('#^https?://#', $pdfUrl)) {
-                                                $pdfUrl = '../' . ltrim($pdfUrl, '/');
-                                            }
-                                        ?>
-                                        <td>
-                                            <div class="d-flex align-items-center">
-                                                <i class="fas fa-file-pdf text-danger me-2"></i>
-                                                <div>
-                                                    <div class="small"><?= htmlspecialchars($displayName) ?></div>
-                                                    <?php if(!empty($pdfUrl)): ?>
-                                                        <a href="<?= htmlspecialchars($pdfUrl) ?>" target="_blank" class="btn btn-sm btn-outline-primary">
-                                                            📄 View PDF
-                                                        </a>
-                                                    <?php else: ?>
-                                                        <span class="badge bg-secondary">No file</span>
-                                                    <?php endif; ?>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span class="status-badge status-<?= $submission['status'] ?>">
-                                                <?= ucfirst(str_replace('_', ' ', $submission['status'])) ?>
-                                            </span>
-                                        </td>
+                                        
                                         <td>
                                             <div><?= date('M j, Y', strtotime($submission['created_at'])) ?></div>
                                             <div class="small text-muted"><?= date('g:i A', strtotime($submission['created_at'])) ?></div>
                                         </td>
-                                        <td>
-                                            <button class="btn btn-sm btn-primary" onclick="reviewSubmission(<?= htmlspecialchars(json_encode($submission)) ?>)">
-                                                📝 Review
-                                            </button>
-                                        </td>
+                                      
                                     </tr>
                                     <?php endwhile; ?>
                                 </tbody>

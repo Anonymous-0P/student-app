@@ -1,0 +1,354 @@
+<?php
+require_once('../config/config.php');
+require_once('../includes/functions.php');
+
+checkLogin('student');
+
+$student_id = $_SESSION['user_id'];
+
+// Get user info
+$user_stmt = $conn->prepare("SELECT name, email, phone FROM users WHERE id = ?");
+$user_stmt->bind_param("i", $student_id);
+$user_stmt->execute();
+$user_info = $user_stmt->get_result()->fetch_assoc();
+
+// Get cart items
+$cart_query = "SELECT c.*, s.code, s.name, s.description, s.department, s.year, s.semester, s.duration_days
+               FROM cart c
+               JOIN subjects s ON c.subject_id = s.id
+               WHERE c.student_id = ?
+               ORDER BY c.added_at";
+
+$cart_stmt = $conn->prepare($cart_query);
+$cart_stmt->bind_param("i", $student_id);
+$cart_stmt->execute();
+$cart_items = $cart_stmt->get_result();
+
+// Calculate total
+$total = 0;
+$items = [];
+while ($item = $cart_items->fetch_assoc()) {
+    $items[] = $item;
+    $total += $item['price'];
+}
+
+// Redirect if cart is empty
+if (count($items) === 0) {
+    header("Location: cart.php");
+    exit();
+}
+
+$pageTitle = "Checkout";
+require_once('../includes/header.php');
+?>
+
+<div class="container">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="browse_exams.php">Browse Exams</a></li>
+                    <li class="breadcrumb-item"><a href="cart.php">Cart</a></li>
+                    <li class="breadcrumb-item active">Checkout</li>
+                </ol>
+            </nav>
+            <h2><i class="fas fa-credit-card text-primary"></i> Checkout</h2>
+            <p class="text-muted">Complete your purchase to get instant access to your selected exams</p>
+        </div>
+    </div>
+
+    <!-- Error Alert -->
+    <?php if (isset($_SESSION['checkout_error'])): ?>
+        <div class="alert alert-danger alert-dismissible fade show">
+            <i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($_SESSION['checkout_error']) ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        <?php unset($_SESSION['checkout_error']); ?>
+    <?php endif; ?>
+
+    <div class="row">
+        <!-- Payment Form -->
+        <div class="col-lg-8">
+            <form id="checkoutForm" action="process_payment.php" method="POST">
+                <!-- Billing Information -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-user"></i> Billing Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Full Name *</label>
+                                <input type="text" name="billing_name" class="form-control" 
+                                       value="<?= htmlspecialchars($user_info['name']) ?>" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Email Address *</label>
+                                <input type="email" name="billing_email" class="form-control" 
+                                       value="<?= htmlspecialchars($user_info['email']) ?>" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Phone Number</label>
+                                <input type="tel" name="billing_phone" class="form-control" 
+                                       value="<?= htmlspecialchars($user_info['phone'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Student ID</label>
+                                <input type="text" class="form-control" 
+                                       value="STU-<?= str_pad($student_id, 6, '0', STR_PAD_LEFT) ?>" readonly>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Payment Method -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-credit-card"></i> Payment Method</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>Demo Mode:</strong> This is a dummy payment gateway for demonstration purposes. 
+                            No real payment will be processed.
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Card Number *</label>
+                                <input type="text" name="card_number" class="form-control" 
+                                       placeholder="1234 5678 9012 3456" 
+                                       value="4242 4242 4242 4242" required>
+                                <small class="text-muted">Use test card: 4242 4242 4242 4242</small>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Cardholder Name *</label>
+                                <input type="text" name="card_name" class="form-control" 
+                                       value="<?= htmlspecialchars($user_info['name']) ?>" required>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Expiry Month *</label>
+                                <select name="card_month" class="form-select" required>
+                                    <option value="">MM</option>
+                                    <?php for ($m = 1; $m <= 12; $m++): ?>
+                                        <option value="<?= str_pad($m, 2, '0', STR_PAD_LEFT) ?>" 
+                                                <?= $m === 12 ? 'selected' : '' ?>>
+                                            <?= str_pad($m, 2, '0', STR_PAD_LEFT) ?>
+                                        </option>
+                                    <?php endfor; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Expiry Year *</label>
+                                <select name="card_year" class="form-select" required>
+                                    <option value="">YYYY</option>
+                                    <?php for ($y = date('Y'); $y <= date('Y') + 10; $y++): ?>
+                                        <option value="<?= $y ?>" <?= $y === (date('Y') + 2) ? 'selected' : '' ?>>
+                                            <?= $y ?>
+                                        </option>
+                                    <?php endfor; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">CVV *</label>
+                                <input type="text" name="card_cvv" class="form-control" 
+                                       placeholder="123" value="123" maxlength="4" required>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Terms and Conditions -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="form-check">
+                            <input type="checkbox" name="terms_agreed" class="form-check-input" id="termsCheck" required>
+                            <label class="form-check-label" for="termsCheck">
+                                I agree to the <a href="#" data-bs-toggle="modal" data-bs-target="#termsModal">Terms and Conditions</a> 
+                                and <a href="#" data-bs-toggle="modal" data-bs-target="#privacyModal">Privacy Policy</a>
+                            </label>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input type="checkbox" name="marketing_consent" class="form-check-input" id="marketingCheck">
+                            <label class="form-check-label" for="marketingCheck">
+                                I would like to receive updates about new exams and special offers (optional)
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <?php csrf_input(); ?>
+            </form>
+        </div>
+
+        <!-- Order Summary -->
+        <div class="col-lg-4">
+            <div class="card sticky-top">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-receipt"></i> Order Summary</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Items List -->
+                    <div class="mb-3">
+                        <?php foreach ($items as $item): ?>
+                            <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-1 small"><?= htmlspecialchars($item['code']) ?></h6>
+                                    <div class="small text-muted">
+                                        <?= htmlspecialchars($item['name']) ?>
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <strong>$<?= number_format($item['price'], 2) ?></strong>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <!-- Totals -->
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Subtotal (<?= count($items) ?> items)</span>
+                        <span>$<?= number_format($total, 2) ?></span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Tax</span>
+                        <span>$0.00</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Processing Fee</span>
+                        <span>$0.00</span>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between mb-3">
+                        <h5>Total</h5>
+                        <h5 class="text-primary">$<?= number_format($total, 2) ?></h5>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="d-grid gap-2">
+                        <button type="submit" form="checkoutForm" class="btn btn-primary btn-lg">
+                            <i class="fas fa-lock"></i> Complete Payment
+                        </button>
+                        <a href="cart.php" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left"></i> Back to Cart
+                        </a>
+                    </div>
+
+                    <!-- Security Notice -->
+                    <div class="mt-3 p-3 bg-light rounded">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-shield-alt text-success me-2"></i>
+                            <small class="text-muted">
+                                Your payment information is secure and encrypted
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Terms Modal -->
+<div class="modal fade" id="termsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Terms and Conditions</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <h6>1. Acceptance of Terms</h6>
+                <p>By purchasing and using our exam platform, you agree to these terms and conditions.</p>
+                
+                <h6>2. Access and Usage</h6>
+                <p>Upon successful payment, you will receive access to the purchased subjects for the specified duration. Access is personal and non-transferable.</p>
+                
+                <h6>3. Refund Policy</h6>
+                <p>Refunds are available within 7 days of purchase if you haven't accessed more than 20% of the content.</p>
+                
+                <h6>4. Academic Integrity</h6>
+                <p>The content is for educational purposes only. Sharing accounts or content is strictly prohibited.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Privacy Modal -->
+<div class="modal fade" id="privacyModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Privacy Policy</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <h6>Data Collection</h6>
+                <p>We collect personal information necessary for account creation and payment processing.</p>
+                
+                <h6>Data Usage</h6>
+                <p>Your data is used to provide educational services, process payments, and improve our platform.</p>
+                
+                <h6>Data Protection</h6>
+                <p>We use industry-standard security measures to protect your personal information.</p>
+                
+                <h6>Third Parties</h6>
+                <p>We do not sell your personal information to third parties.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.sticky-top {
+    top: 20px;
+}
+
+.card {
+    border: 1px solid #e3e6f0;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #4e73df;
+    box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25);
+}
+
+.btn-primary {
+    background-color: #4e73df;
+    border-color: #4e73df;
+}
+
+.btn-primary:hover {
+    background-color: #2e59d9;
+    border-color: #2e59d9;
+}
+</style>
+
+<script>
+// Format card number input
+document.querySelector('input[name="card_number"]').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\s/g, '').replace(/[^0-9]/gi, '');
+    let formattedValue = value.match(/.{1,4}/g)?.join(' ') || value;
+    e.target.value = formattedValue;
+});
+
+// Validate form before submission
+document.getElementById('checkoutForm').addEventListener('submit', function(e) {
+    const termsCheck = document.getElementById('termsCheck');
+    if (!termsCheck.checked) {
+        e.preventDefault();
+        alert('Please accept the Terms and Conditions to continue.');
+        termsCheck.focus();
+        return false;
+    }
+});
+</script>
+
+<?php require_once('../includes/footer.php'); ?>

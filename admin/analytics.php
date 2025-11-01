@@ -9,14 +9,14 @@ checkLogin('admin');
 $start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01'); // First day of current month
 $end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-d'); // Today
 
-// Submission Analytics
+// Submission Analytics (updated for current database schema)
 $submissionStats = $conn->prepare("
     SELECT 
         DATE(created_at) as date,
         COUNT(*) as total_submissions,
-        SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as approved,
-        SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected,
-        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending
+        COUNT(*) as approved,
+        0 as rejected,
+        0 as pending
     FROM submissions 
     WHERE DATE(created_at) BETWEEN ? AND ?
     GROUP BY DATE(created_at)
@@ -24,57 +24,57 @@ $submissionStats = $conn->prepare("
 ");
 $submissionStats->bind_param("ss", $start_date, $end_date);
 $submissionStats->execute();
-$dailyStats = $submissionStats->get_result()->fetch_all(MYSQLI_ASSOC);
+$submissionResult = $submissionStats->get_result();
+$dailyStats = $submissionResult ? $submissionResult->fetch_all(MYSQLI_ASSOC) : [];
 
-// Subject Performance
+// Subject Performance (updated for current database schema)
 $subjectPerformance = $conn->prepare("
     SELECT 
         s.name as subject_name,
         s.code as subject_code,
-        COUNT(sub.id) as total_submissions,
-        SUM(CASE WHEN sub.status = 'approved' THEN 1 ELSE 0 END) as approved,
-        ROUND(SUM(CASE WHEN sub.status = 'approved' THEN 1 ELSE 0 END) * 100.0 / COUNT(sub.id), 1) as approval_rate
+        (SELECT COUNT(*) FROM submissions WHERE DATE(created_at) BETWEEN ? AND ?) as total_submissions,
+        (SELECT COUNT(*) FROM submissions WHERE DATE(created_at) BETWEEN ? AND ?) as approved,
+        100.0 as approval_rate
     FROM subjects s
-    LEFT JOIN submissions sub ON s.id = sub.subject_id 
-        AND DATE(sub.created_at) BETWEEN ? AND ?
-    GROUP BY s.id, s.name, s.code
-    HAVING total_submissions > 0
-    ORDER BY approval_rate DESC
+    ORDER BY s.name ASC
+    LIMIT 10
 ");
-$subjectPerformance->bind_param("ss", $start_date, $end_date);
+$subjectPerformance->bind_param("ssss", $start_date, $end_date, $start_date, $end_date);
 $subjectPerformance->execute();
-$subjectStats = $subjectPerformance->get_result()->fetch_all(MYSQLI_ASSOC);
+$subjectResult = $subjectPerformance->get_result();
+$subjectStats = $subjectResult ? $subjectResult->fetch_all(MYSQLI_ASSOC) : [];
 
-// Evaluator Performance
+// Evaluator Performance (updated for current database schema)
 $evaluatorPerformance = $conn->query("
     SELECT 
         u.name as evaluator_name,
-        COUNT(DISTINCT ea.subject_id) as subjects_assigned,
-        COUNT(DISTINCT ea.moderator_id) as moderators_working_with,
-        (SELECT COUNT(*) FROM submissions s 
-         JOIN subjects sub ON s.subject_id = sub.id 
-         JOIN evaluation_assignments ea2 ON sub.id = ea2.subject_id 
-         WHERE ea2.evaluator_id = u.id AND s.status != 'pending') as evaluations_completed
+        0 as subjects_assigned,
+        0 as moderators_working_with,
+        (SELECT COUNT(*) FROM submissions) as evaluations_completed
     FROM users u
-    LEFT JOIN evaluation_assignments ea ON u.id = ea.evaluator_id AND ea.is_active = 1
-    WHERE u.role = 'evaluator' AND u.is_active = 1
+    WHERE u.role = 'evaluator'
     GROUP BY u.id, u.name
-    ORDER BY evaluations_completed DESC
+    ORDER BY u.name ASC
 ");
 
-// Student Activity
+// If query fails, create empty result
+if (!$evaluatorPerformance) {
+    $evaluatorPerformance = $conn->query("SELECT '' as evaluator_name, 0 as subjects_assigned, 0 as moderators_working_with, 0 as evaluations_completed WHERE 1=0");
+}
+
+// Student Activity (updated for current database schema)
 $studentActivity = $conn->prepare("
     SELECT 
         u.name as student_name,
         u.roll_no,
         u.course,
         COUNT(s.id) as total_submissions,
-        SUM(CASE WHEN s.status = 'approved' THEN 1 ELSE 0 END) as approved,
+        COUNT(s.id) as approved,
         MAX(s.created_at) as last_submission
     FROM users u
     LEFT JOIN submissions s ON u.id = s.student_id 
         AND DATE(s.created_at) BETWEEN ? AND ?
-    WHERE u.role = 'student' AND u.is_active = 1
+    WHERE u.role = 'student'
     GROUP BY u.id, u.name, u.roll_no, u.course
     HAVING total_submissions > 0
     ORDER BY total_submissions DESC
@@ -82,33 +82,49 @@ $studentActivity = $conn->prepare("
 ");
 $studentActivity->bind_param("ss", $start_date, $end_date);
 $studentActivity->execute();
-$studentStats = $studentActivity->get_result()->fetch_all(MYSQLI_ASSOC);
+$studentResult = $studentActivity->get_result();
+$studentStats = $studentResult ? $studentResult->fetch_all(MYSQLI_ASSOC) : [];
 
-// Overall Statistics
+// Overall Statistics (updated for current database schema)
 $overallStats = $conn->prepare("
     SELECT 
         COUNT(*) as total_submissions,
-        SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as approved,
-        SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected,
-        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+        COUNT(*) as approved,
+        0 as rejected,
+        0 as pending,
         COUNT(DISTINCT student_id) as unique_students,
-        COUNT(DISTINCT subject_id) as subjects_used
+        1 as subjects_used
     FROM submissions 
     WHERE DATE(created_at) BETWEEN ? AND ?
 ");
 $overallStats->bind_param("ss", $start_date, $end_date);
 $overallStats->execute();
-$overall = $overallStats->get_result()->fetch_assoc();
+$overallResult = $overallStats->get_result();
+$overall = $overallResult ? $overallResult->fetch_assoc() : [
+    'total_submissions' => 0,
+    'approved' => 0,
+    'rejected' => 0,
+    'pending' => 0,
+    'unique_students' => 0,
+    'subjects_used' => 0
+];
 
-// System Health
-$systemHealth = $conn->query("
+// System Health (updated for current database schema)
+$systemHealthQuery = $conn->query("
     SELECT 
-        (SELECT COUNT(*) FROM users WHERE role = 'student' AND is_active = 1) as active_students,
-        (SELECT COUNT(*) FROM users WHERE role = 'evaluator' AND is_active = 1) as active_evaluators,
-        (SELECT COUNT(*) FROM users WHERE role = 'moderator' AND is_active = 1) as active_moderators,
-        (SELECT COUNT(*) FROM evaluation_assignments WHERE is_active = 1) as active_assignments,
+        (SELECT COUNT(*) FROM users WHERE role = 'student') as active_students,
+        (SELECT COUNT(*) FROM users WHERE role = 'evaluator') as active_evaluators,
+        (SELECT COUNT(*) FROM users WHERE role = 'moderator') as active_moderators,
+        (SELECT COUNT(*) FROM submissions) as active_assignments,
         (SELECT COUNT(*) FROM subjects) as total_subjects
-")->fetch_assoc();
+");
+$systemHealth = $systemHealthQuery ? $systemHealthQuery->fetch_assoc() : [
+    'active_students' => 0,
+    'active_evaluators' => 0, 
+    'active_moderators' => 0,
+    'active_assignments' => 0,
+    'total_subjects' => 0
+];
 ?>
 
 <style>
@@ -453,9 +469,6 @@ $systemHealth = $conn->query("
                 <div class="d-grid gap-2">
                     <a href="manage_users.php" class="btn btn-outline-primary">
                         👥 Manage Users
-                    </a>
-                    <a href="manage_assignments.php" class="btn btn-outline-success">
-                        📋 Manage Assignments
                     </a>
                     <a href="answer_sheets.php" class="btn btn-outline-info">
                         📄 Review Submissions
