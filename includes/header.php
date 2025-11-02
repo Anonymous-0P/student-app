@@ -29,8 +29,11 @@ if (isset($pathParts[1]) && in_array($pathParts[1], ['auth', 'student', 'faculty
     <link rel="stylesheet" href="<?= $baseUrl ?>assets/css/style.css">
 </head>
 <body class="bg-light d-flex flex-column min-vh-100">
+<?php $isIndexPage = (basename($_SERVER['PHP_SELF']) == 'index.php'); ?>
 <style>
-/* Enhanced Navbar Styling */
+/* Conditional Navbar Styling */
+<?php if ($isIndexPage): ?>
+/* Original Gradient Navbar for Index Page */
 .navbar-enhanced {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #8B5FBF 100%) !important;
     backdrop-filter: blur(10px);
@@ -131,7 +134,6 @@ if (isset($pathParts[1]) && in_array($pathParts[1], ['auth', 'student', 'faculty
     transform: scale(1.05);
 }
 
-/* Enhanced icon styling for better visibility */
 .nav-link-enhanced i {
     margin-right: 0.5rem !important;
     font-size: 1rem !important;
@@ -144,11 +146,6 @@ if (isset($pathParts[1]) && in_array($pathParts[1], ['auth', 'student', 'faculty
     color: white !important;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4) !important;
     transform: scale(1.1) !important;
-}
-
-.nav-link-enhanced.active i {
-    color: white !important;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5) !important;
 }
 
 .navbar-toggler-enhanced {
@@ -166,89 +163,185 @@ if (isset($pathParts[1]) && in_array($pathParts[1], ['auth', 'student', 'faculty
     transform: scale(1.05);
 }
 
-.navbar-toggler-enhanced:focus {
-    box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.3) !important;
+/* Show all nav items on index page */
+.navbar-nav .nav-item {
+    display: block !important;
 }
 
-/* Scroll effect */
-.navbar-scrolled {
-    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4) !important;
-    backdrop-filter: blur(15px) !important;
+.hamburger-btn {
+    display: flex !important;
 }
+
+<?php else: ?>
+/* Minimal Clean Navbar for Dashboard Pages */
+.navbar-enhanced {
+    background: white !important;
+    border-bottom: 1px solid #e5e7eb !important;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05) !important;
+    padding: 1rem 0 !important;
+}
+
+.navbar-enhanced::before,
+.navbar-enhanced::after {
+    display: none !important;
+}
+
+.navbar-brand-enhanced {
+    font-weight: 600 !important;
+    color: #111827 !important;
+    font-size: 1.25rem !important;
+    text-decoration: none !important;
+    transition: color 0.2s ease;
+}
+
+.navbar-brand-enhanced::before {
+    content: '';
+    margin-right: 0;
+}
+
+.navbar-brand-enhanced:hover {
+    color: #111827 !important;
+    transform: none;
+    text-shadow: none;
+}
+
+.nav-link-enhanced {
+    color: #6b7280 !important;
+    font-weight: 500 !important;
+    padding: 0.75rem 1rem !important;
+    border-radius: 8px !important;
+    transition: color 0.2s ease !important;
+    position: relative !important;
+    margin: 0 0.25rem !important;
+    text-decoration: none !important;
+}
+
+.nav-link-enhanced::before {
+    display: none !important;
+}
+
+.nav-link-enhanced:hover {
+    color: #007bff !important;
+    transform: none;
+    text-shadow: none;
+    text-decoration: none !important;
+}
+
+.nav-link-enhanced:hover::before {
+    opacity: 0;
+    transform: scale(1.05);
+}
+
+.nav-link-enhanced i {
+    margin-right: 0.5rem !important;
+    font-size: 1rem !important;
+    color: inherit !important;
+    transition: color 0.2s ease !important;
+}
+
+.nav-link-enhanced:hover i {
+    color: inherit !important;
+}
+
+.navbar-toggler-enhanced {
+    border: 1px solid #d1d5db !important;
+    border-radius: 6px !important;
+    padding: 0.5rem !important;
+}
+
+/* Hide all navbar items except specific ones based on role */
+<?php
+$currentPath = $_SERVER['REQUEST_URI'];
+$isStudentPage = strpos($currentPath, '/student/') !== false;
+$isAdminPage = strpos($currentPath, '/admin/') !== false;
+$isModeratorPage = strpos($currentPath, '/moderator/') !== false;
+$isEvaluatorPage = strpos($currentPath, '/evaluator/') !== false;
+?>
+
+<?php if ($isStudentPage): ?>
+/* Show dashboard, home, and logout for student pages */
+.navbar-nav .nav-item {
+    display: none !important;
+}
+.navbar-nav .nav-item:has(a[href*="student/dashboard.php"]),
+.navbar-nav .nav-item:has(a[href*="index.php"]),
+.navbar-nav .nav-item:has(a[href*="logout.php"]) {
+    display: block !important;
+}
+<?php else: ?>
+/* Show only dashboard link for other roles */
+.navbar-nav .nav-item {
+    display: none !important;
+}
+.navbar-nav .nav-item:has(a[href*="dashboard.php"]) {
+    display: block !important;
+}
+<?php endif; ?>
+
+/* Hide hamburger menu button */
+.hamburger-btn {
+    display: none !important;
+}
+<?php endif; ?>
 
 /* Mobile responsive improvements */
 @media (max-width: 991.98px) {
     .navbar-nav {
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 12px;
-        padding: 1rem;
-        margin-top: 1rem;
-        backdrop-filter: blur(10px);
+        background: transparent;
+        padding: 0;
     }
     
     .nav-link-enhanced {
         margin: 0.25rem 0 !important;
-        text-align: center;
-    }
-}
-
-/* Active state for current page */
-.nav-link-enhanced.active {
-    background: rgba(255, 255, 255, 0.2) !important;
-    color: white !important;
-    font-weight: 600 !important;
-}
-
-/* Floating effect on scroll */
-.navbar-floating {
-    position: fixed !important;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 95%;
-    max-width: 1200px;
-    border-radius: 16px;
-    z-index: 1030;
-    box-shadow: 0 10px 40px rgba(102, 126, 234, 0.4);
-}
-
-@media (max-width: 768px) {
-    .navbar-floating {
-        width: 98%;
-        top: 5px;
-        border-radius: 12px;
+        text-align: left;
     }
 }
 </style>
 
-<header class="navbar navbar-expand-lg navbar-dark navbar-enhanced shadow-sm">
+<header class="navbar navbar-expand-lg <?= $isIndexPage ? 'navbar-dark' : 'navbar-light' ?> navbar-enhanced shadow-sm">
     <div class="container">
-    <a class="navbar-brand navbar-brand-enhanced" href="<?= $baseUrl ?>index.php">ThetaExams</a>
+    <a class="navbar-brand navbar-brand-enhanced" href="<?= $baseUrl ?>index.php">
+        <?php if (!$isIndexPage): ?>
+            <i class="fas fa-graduation-cap me-2"></i>
+            <?php 
+            if (isset($_SESSION['role'])) {
+                switch ($_SESSION['role']) {
+                    case 'student':
+                        echo 'Student Panel';
+                        break;
+                    case 'moderator':
+                        echo 'Moderator Panel';
+                        break;
+                    case 'evaluator':
+                        echo 'Evaluator Panel';
+                        break;
+                    case 'admin':
+                        echo 'Admin Panel';
+                        break;
+                    default:
+                        echo 'Admin Panel';
+                }
+            } else {
+                echo 'Admin Panel';
+            }
+            ?>
+        <?php else: ?>ThetaExams<?php endif; ?>
+    </a>
         <button class="navbar-toggler navbar-toggler-enhanced" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="mainNav">
             <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
-                <li class="nav-item">
-                    <a class="nav-link nav-link-enhanced <?= (basename($_SERVER['PHP_SELF']) == 'index.php') ? 'active' : '' ?>" href="<?= $baseUrl ?>index.php">
-                        <i class="fas fa-home"></i> Home
-                    </a>
-                </li>
                 <?php if(isset($_SESSION['role'])): ?>
                     <?php if($_SESSION['role'] == 'student'): ?>
                         <li class="nav-item">
                             <a class="nav-link nav-link-enhanced <?= (strpos($_SERVER['REQUEST_URI'], 'student/dashboard') !== false) ? 'active' : '' ?>" href="<?= $baseUrl ?>student/dashboard.php">
-                                <i class="fas fa-chart-pie"></i> Dashboard
+                                <i class="fas fa-tachometer-alt"></i> Dashboard
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link nav-link-enhanced <?= (strpos($_SERVER['REQUEST_URI'], 'student/browse_exams') !== false) ? 'active' : '' ?>" href="<?= $baseUrl ?>student/browse_exams.php">
-                                <i class="fas fa-books"></i> Browse Exams
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link nav-link-enhanced <?= (strpos($_SERVER['REQUEST_URI'], 'student/cart') !== false) ? 'active' : '' ?>" href="<?= $baseUrl ?>student/cart.php">
-                                <i class="fas fa-shopping-cart"></i> Cart
+                            <a class="nav-link nav-link-enhanced <?= (basename($_SERVER['PHP_SELF']) == 'index.php') ? 'active' : '' ?>" href="<?= $baseUrl ?>index.php">
+                                <i class="fas fa-home"></i> Home
                             </a>
                         </li>
                     <?php elseif($_SESSION['role'] == 'admin'): ?>
@@ -257,48 +350,18 @@ if (isset($pathParts[1]) && in_array($pathParts[1], ['auth', 'student', 'faculty
                                 <i class="fas fa-tachometer-alt"></i> Admin Portal
                             </a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link nav-link-enhanced <?= (strpos($_SERVER['REQUEST_URI'], 'admin/subjects') !== false) ? 'active' : '' ?>" href="<?= $baseUrl ?>admin/subjects.php">
-                                <i class="fas fa-book"></i> Subjects
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link nav-link-enhanced <?= (strpos($_SERVER['REQUEST_URI'], 'admin/analytics') !== false) ? 'active' : '' ?>" href="<?= $baseUrl ?>admin/analytics.php">
-                                <i class="fas fa-chart-line"></i> Analytics
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link nav-link-enhanced <?= (strpos($_SERVER['REQUEST_URI'], 'admin/reports') !== false) ? 'active' : '' ?>" href="<?= $baseUrl ?>admin/reports.php">
-                                <i class="fas fa-chart-bar"></i> Reports
-                            </a>
-                        </li>
                     <?php elseif($_SESSION['role'] == 'moderator'): ?>
                         <li class="nav-item">
                             <a class="nav-link nav-link-enhanced <?= (strpos($_SERVER['REQUEST_URI'], 'moderator/dashboard') !== false) ? 'active' : '' ?>" href="<?= $baseUrl ?>moderator/dashboard.php">
-                                <i class="fas fa-user-tie"></i> Moderator Panel
+                                <i class="fas fa-user-tie"></i> Moderator Portal
                             </a>
                         </li>
                     <?php elseif($_SESSION['role'] == 'evaluator'): ?>
-                        <!-- <li class="nav-item">
-                            <a class="nav-link nav-link-enhanced <?= (strpos($_SERVER['REQUEST_URI'], 'evaluator/dashboard') !== false) ? 'active' : '' ?>" href="<?= $baseUrl ?>evaluator/dashboard.php">
-                                <i class="fas fa-tachometer-alt"></i> 
-                            </a>
-                        </li> -->
                         <li class="nav-item">
                             <a class="nav-link nav-link-enhanced <?= (strpos($_SERVER['REQUEST_URI'], 'evaluator/assignments') !== false) ? 'active' : '' ?>" href="<?= $baseUrl ?>evaluator/assignments.php">
-                                <i class="fas fa-tasks"></i> Dashboard
+                                <i class="fas fa-tasks"></i> Evaluator Portal
                             </a>
                         </li>
-                        <!-- <li class="nav-item">
-                            <a class="nav-link nav-link-enhanced <?= (strpos($_SERVER['REQUEST_URI'], 'evaluator/pending_evaluations') !== false) ? 'active' : '' ?>" href="<?= $baseUrl ?>evaluator/pending_evaluations.php">
-                                <i class="fas fa-clock"></i> Evaluations
-                            </a>
-                        </li> -->
-                        <!-- <li class="nav-item">
-                            <a class="nav-link nav-link-enhanced <?= (strpos($_SERVER['REQUEST_URI'], 'evaluator/evaluation_history') !== false) ? 'active' : '' ?>" href="<?= $baseUrl ?>evaluator/evaluation_history.php">
-                                <i class="fas fa-history"></i> History
-                            </a>
-                        </li> -->
                     <?php endif; ?>
                     <li class="nav-item">
                         <a class="nav-link nav-link-enhanced" href="<?= $baseUrl ?>auth/logout.php" onclick="return confirm('Are you sure you want to logout?')">

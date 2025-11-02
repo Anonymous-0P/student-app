@@ -55,170 +55,46 @@ if($stmt) {
     <link href="../assets/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="../assets/css/style.css" rel="stylesheet">
-    <style>
-        .evaluations-page {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding-top: 80px;
-        }
-        
-        .evaluations-container {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 15px;
-            padding: 30px;
-            margin-bottom: 25px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
-        }
-        
-        .evaluation-card {
-            background: rgba(255, 255, 255, 0.9);
-            border-radius: 12px;
-            padding: 25px;
-            margin-bottom: 20px;
-            border: 1px solid rgba(0, 0, 0, 0.1);
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-        }
-        
-        .evaluation-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-        }
-        
-        .priority-urgent {
-            border-left: 5px solid #dc3545;
-        }
-        
-        .priority-normal {
-            border-left: 5px solid #28a745;
-        }
-        
-        .priority-warning {
-            border-left: 5px solid #ffc107;
-        }
-        
-        .deadline-urgent {
-            color: #dc3545;
-            font-weight: 600;
-        }
-        
-        .deadline-warning {
-            color: #fd7e14;
-            font-weight: 600;
-        }
-        
-        .deadline-normal {
-            color: #28a745;
-        }
-        
-        .student-info {
-            background: rgba(108, 92, 231, 0.1);
-            border-radius: 8px;
-            padding: 12px;
-            margin: 10px 0;
-        }
-        
-        .subject-tag {
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            color: white;
-            padding: 4px 12px;
-            border-radius: 15px;
-            font-size: 0.8rem;
-            font-weight: 600;
-        }
-        
-        .btn-evaluate-now {
-            background: linear-gradient(45deg, #28a745, #20c997);
-            border: none;
-            color: white;
-            font-weight: 600;
-            padding: 12px 24px;
-            border-radius: 25px;
-            transition: all 0.3s ease;
-        }
-        
-        .btn-evaluate-now:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
-            color: white;
-        }
-        
-        .filter-tabs {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 25px;
-            padding: 5px;
-            margin-bottom: 20px;
-        }
-        
-        .filter-tab {
-            background: transparent;
-            border: none;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 20px;
-            margin: 2px;
-            transition: all 0.3s ease;
-        }
-        
-        .filter-tab.active {
-            background: rgba(255, 255, 255, 0.9);
-            color: #667eea;
-            font-weight: 600;
-        }
-    </style>
+    <link href="css/evaluator-style.css" rel="stylesheet">
 </head>
 <body>
     <?php include('../includes/header.php'); ?>
     
-    <div class="evaluations-page">
+    <div class="evaluator-content">
         <div class="container">
             <!-- Page Header -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="text-center text-white">
-                        <h1 class="display-5 mb-3">
-                            <i class="fas fa-clipboard-list me-3"></i>
-                            Pending Evaluations
-                        </h1>
-                        <p class="lead">Review and evaluate assigned submissions</p>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Filter Tabs -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="filter-tabs text-center">
-                        <button class="filter-tab active" onclick="filterEvaluations('all')">
-                            <i class="fas fa-list me-2"></i>All Pending (<?php echo count($pending_evaluations); ?>)
-                        </button>
-                        <button class="filter-tab" onclick="filterEvaluations('urgent')">
-                            <i class="fas fa-exclamation-triangle me-2"></i>Urgent
-                        </button>
-                        <button class="filter-tab" onclick="filterEvaluations('due-today')">
-                            <i class="fas fa-calendar-day me-2"></i>Due Today
-                        </button>
+            <div class="page-header">
+                <div class="row">
+                    <div class="col-12">
+                        <h1><i class="fas fa-clipboard-list me-2"></i>Pending Evaluations</h1>
+                        <p>Review and evaluate assigned submissions</p>
                     </div>
                 </div>
             </div>
 
+
             <!-- Evaluations Container -->
             <div class="row">
                 <div class="col-12">
-                    <div class="evaluations-container">
+                    <div class="dashboard-card">
+                        <h5><i class="fas fa-clipboard-list me-2"></i>Pending Evaluations (<?php echo count($pending_evaluations); ?>)</h5>
                         <?php if (empty($pending_evaluations)): ?>
-                            <div class="text-center py-5">
-                                <i class="fas fa-clipboard-check fa-4x text-success mb-4"></i>
-                                <h3 class="text-muted mb-3">No Pending Evaluations</h3>
-                                <p class="text-muted">Great job! You're all caught up with your evaluations.</p>
-                                <a href="dashboard.php" class="btn btn-primary">
-                                    <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
-                                </a>
+                            <div class="text-center py-4">
+                                <i class="fas fa-clipboard-check fa-3x text-muted mb-3"></i>
+                                <p class="text-muted">No pending evaluations. Great job!</p>
                             </div>
                         <?php else: ?>
-                            <div id="evaluations-list">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Submission</th>
+                                            <th>Student</th>
+                                            <th>Subject</th>
+                                            <th>Deadline</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
                                 <?php foreach ($pending_evaluations as $evaluation): ?>
                                     <?php
                                     $deadline = strtotime($evaluation['evaluation_deadline']);
@@ -244,97 +120,44 @@ if($stmt) {
                                         $deadline_text = 'Due in ' . $days_left . ' days';
                                     }
                                     ?>
-                                    
-                                    <div class="evaluation-card <?php echo $priority_class; ?>" 
-                                         data-priority="<?php echo ($days_left <= 0) ? 'urgent' : (($days_left <= 2) ? 'warning' : 'normal'); ?>"
-                                         data-due-date="<?php echo date('Y-m-d', $deadline); ?>">
-                                        
-                                        <div class="row align-items-center">
-                                            <div class="col-md-8">
-                                                <!-- Submission Title -->
-                                                <div class="d-flex align-items-center mb-3">
-                                                    <h5 class="mb-0 me-3">
-                                                        <i class="fas fa-file-alt me-2 text-primary"></i>
-                                                        <?php echo htmlspecialchars($evaluation['submission_title']); ?>
-                                                    </h5>
-                                                    <span class="subject-tag">
-                                                        <?php echo htmlspecialchars($evaluation['subject_code']); ?>
-                                                    </span>
-                                                </div>
-                                                
-                                                <!-- Subject and Student Info -->
-                                                <div class="student-info">
-                                                    <div class="row">
-                                                        <div class="col-md-6">
-                                                            <p class="mb-1">
-                                                                <i class="fas fa-book me-2"></i>
-                                                                <strong>Subject:</strong> <?php echo htmlspecialchars($evaluation['subject_name']); ?>
-                                                            </p>
-                                                            <p class="mb-1">
-                                                                <i class="fas fa-building me-2"></i>
-                                                                <strong>Department:</strong> <?php echo htmlspecialchars($evaluation['department']); ?>
-                                                            </p>
-                                                        </div>
-                                                        <div class="col-md-6">
-                                                            <p class="mb-1">
-                                                                <i class="fas fa-user me-2"></i>
-                                                                <strong>Student:</strong> <?php echo htmlspecialchars($evaluation['student_name']); ?>
-                                                            </p>
-                                                            <p class="mb-1">
-                                                                <i class="fas fa-envelope me-2"></i>
-                                                                <strong>Email:</strong> <?php echo htmlspecialchars($evaluation['student_email']); ?>
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                
-                                                <!-- Dates -->
-                                                <div class="mt-3">
-                                                    <small class="text-muted me-4">
-                                                        <i class="fas fa-calendar-plus me-1"></i>
-                                                        Submitted: <?php echo date('M j, Y g:i A', strtotime($evaluation['submission_date'])); ?>
-                                                    </small>
-                                                    <small class="text-muted">
-                                                        <i class="fas fa-user-tie me-1"></i>
-                                                        Assigned by: <?php echo htmlspecialchars($evaluation['moderator_name']); ?>
-                                                    </small>
-                                                </div>
+                                    <tr>
+                                        <td>
+                                            <strong><?php echo htmlspecialchars($evaluation['submission_title']); ?></strong>
+                                            <br><small class="text-muted">Submitted: <?php echo date('M j, Y', strtotime($evaluation['submission_date'])); ?></small>
+                                        </td>
+                                        <td>
+                                            <?php echo htmlspecialchars($evaluation['student_name']); ?>
+                                            <br><small class="text-muted"><?php echo htmlspecialchars($evaluation['student_email']); ?></small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-primary"><?php echo htmlspecialchars($evaluation['subject_code']); ?></span>
+                                            <br><small><?php echo htmlspecialchars($evaluation['subject_name']); ?></small>
+                                        </td>
+                                        <td>
+                                            <span class="<?php echo $deadline_class; ?>">
+                                                <?php echo $deadline_text; ?>
+                                            </span>
+                                            <br><small class="text-muted"><?php echo date('M j, Y', $deadline); ?></small>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group">
+                                                <a href="evaluate.php?id=<?php echo $evaluation['submission_id']; ?>" 
+                                                   class="btn btn-primary btn-sm">
+                                                    <i class="fas fa-edit"></i> Evaluate
+                                                </a>
                                             </div>
-                                            
-                                            <div class="col-md-4 text-end">
-                                                <!-- Deadline -->
-                                                <div class="mb-3">
-                                                    <div class="<?php echo $deadline_class; ?>">
-                                                        <i class="fas fa-clock me-2"></i>
-                                                        <?php echo $deadline_text; ?>
-                                                    </div>
-                                                    <small class="text-muted">
-                                                        <?php echo date('M j, Y g:i A', $deadline); ?>
-                                                    </small>
-                                                </div>
-                                                
-                                                <!-- Action Buttons -->
-                                                <div class="d-grid gap-2">
-                                                    <a href="evaluate.php?id=<?php echo $evaluation['submission_id']; ?>" 
-                                                       class="btn btn-evaluate-now">
-                                                        <i class="fas fa-edit me-2"></i>Start Evaluation
-                                                    </a>
-                                                    <a href="preview_submission.php?id=<?php echo $evaluation['submission_id']; ?>" 
-                                                       class="btn btn-outline-primary btn-sm">
-                                                        <i class="fas fa-eye me-2"></i>Preview Submission
-                                                    </a>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
+                                        </td>
+                                    </tr>
                                 <?php endforeach; ?>
-                            </div>
+                                    </tbody>
+                                </table>
                         <?php endif; ?>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
     <?php include('../includes/footer.php'); ?>
     

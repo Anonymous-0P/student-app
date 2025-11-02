@@ -83,14 +83,14 @@ require_once('../includes/header.php');
                                             <i class="fas fa-calendar-alt text-muted me-1"></i>
                                             <?= $item['duration_days'] ?> days
                                         </td>
-                                        <td class="text-end">$<?= number_format($item['price'], 2) ?></td>
+                                        <td class="text-end">₹<?= number_format($item['price'], 2) ?></td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
                             <tfoot>
                                 <tr class="table-success">
                                     <th colspan="3">Total</th>
-                                    <th class="text-end">$<?= number_format($payment_data['total'], 2) ?></th>
+                                    <th class="text-end">₹<?= number_format($payment_data['total'], 2) ?></th>
                                 </tr>
                             </tfoot>
                         </table>

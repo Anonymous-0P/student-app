@@ -463,58 +463,87 @@ if($is_active_check && $is_active_check->num_rows > 0) {
 $departments = $conn->query("SELECT DISTINCT department FROM users WHERE role = 'moderator' AND department IS NOT NULL ORDER BY department");
 ?>
 
+<link rel="stylesheet" href="../moderator/css/moderator-style.css">
+
 <style>
-.moderator-card {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    transition: all 0.3s ease;
-    border: none;
-    margin-bottom: 1rem;
+/* Navbar Styling Override - Match evaluation_ratings.php */
+.navbar-enhanced {
+    background: white !important;
+    border-bottom: 1px solid #e5e7eb !important;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05) !important;
+    padding: 1rem 0 !important;
 }
 
-.moderator-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+.navbar-enhanced::before,
+.navbar-enhanced::after {
+    display: none !important;
+}
+
+.navbar-brand-enhanced {
+    font-weight: 600 !important;
+    color: #111827 !important;
+    font-size: 1.25rem !important;
+}
+
+.navbar-brand-enhanced:hover {
+    color: #111827 !important;
+}
+
+.nav-link-enhanced {
+    color: #6b7280 !important;
+    font-weight: 500 !important;
+    transition: color 0.2s ease !important;
+}
+
+.nav-link-enhanced:hover {
+    color: #007bff !important;
+}
+
+.nav-link-enhanced::before {
+    display: none !important;
+}
+
+.nav-link-enhanced i {
+    color: inherit !important;
+}
+
+/* Hide all navbar items except back to dashboard */
+.navbar-nav .nav-item {
+    display: none !important;
+}
+
+/* Only show the dashboard link */
+.navbar-nav .nav-item:has(a[href*="dashboard.php"]) {
+    display: block !important;
+}
+
+/* Hide hamburger menu button */
+.hamburger-btn {
+    display: none !important;
 }
 
 .status-active { 
-    color: #28a745; 
+    color: var(--success-color);
     font-weight: 600; 
 }
 
 .status-inactive { 
-    color: #dc3545; 
+    color: var(--danger-color);
     font-weight: 600; 
 }
 
-.modal-content {
-    border-radius: 15px;
-    border: none;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-}
-
 .fade-in {
-    animation: fadeIn 0.6s ease-out;
+    animation: fadeIn 0.4s ease-out;
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(30px); }
+    from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
-.stats-card {
-    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-    color: white;
-    text-align: center;
-    border-radius: 12px;
-    padding: 1.5rem;
-    transition: transform 0.3s ease;
-}
-
-.stats-card:hover {
-    transform: translateY(-5px);
+/* Ensure all badges have white text */
+.badge {
+    color: white !important;
 }
 
 .btn-group-actions {
@@ -547,16 +576,23 @@ $departments = $conn->query("SELECT DISTINCT department FROM users WHERE role = 
 }
 
 .search-filters {
-    background: #f8f9fa;
-    border-radius: 10px;
-    padding: 1rem;
+    background: var(--bg-light);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
     margin-bottom: 1.5rem;
+}
+
+.stat-sublabel {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
 }
 </style>
 
-<div class="container-fluid">
+<div class="container-fluid" style="padding-left: 50px; padding-right: 50px;">
     <!-- Header -->
-    <div class="row mb-4 fade-in">
+    <div class="row mb-4 mt-4 fade-in">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
@@ -566,7 +602,7 @@ $departments = $conn->query("SELECT DISTINCT department FROM users WHERE role = 
                     <p class="text-muted mb-0">Manage moderator accounts, assignments, and permissions</p>
                 </div>
                 <div>
-                    <button class="btn btn-success" onclick="showAddModal()">
+                    <button class="btn btn-primary" onclick="showAddModal()">
                         <i class="fas fa-user-plus"></i> Add New Moderator
                     </button>
                 </div>
@@ -589,30 +625,49 @@ $departments = $conn->query("SELECT DISTINCT department FROM users WHERE role = 
     <?php endif; ?>
 
     <!-- Moderator Statistics -->
-    <div class="row g-3 mb-4 fade-in">
+    <div class="row g-4 mb-4 fade-in">
         <div class="col-md-3">
-            <div class="stats-card">
-                <div class="h3 mb-1"><?= $moderatorStats['active_moderators'] ?></div>
-                <div class="small">Active Moderators</div>
-                <div class="small opacity-75"><?= $moderatorStats['total_moderators'] ?> total</div>
+            <div class="stat-box">
+                <div class="stat-icon" style="background-color: rgba(16, 185, 129, 0.1); color: #10b981;">
+                    <i class="fas fa-user-check"></i>
+                </div>
+                <div class="stat-details">
+                    <div class="stat-value"><?= $moderatorStats['active_moderators'] ?></div>
+                    <div class="stat-label">Active Moderators</div>
+                </div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="stats-card">
-                <div class="h3 mb-1"><?= $moderatorStats['total_departments'] ?></div>
-                <div class="small">Departments</div>
+            <div class="stat-box">
+                <div class="stat-icon" style="background-color: rgba(37, 99, 235, 0.1); color: #2563eb;">
+                    <i class="fas fa-building"></i>
+                </div>
+                <div class="stat-details">
+                    <div class="stat-value"><?= $moderatorStats['total_departments'] ?></div>
+                    <div class="stat-label">Departments</div>
+                </div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="stats-card">
-                <div class="h3 mb-1"><?= $moderatorStats['total_assigned_users'] ?></div>
-                <div class="small">Assigned Users</div>
+            <div class="stat-box">
+                <div class="stat-icon" style="background-color: rgba(245, 158, 11, 0.1); color: #f59e0b;">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="stat-details">
+                    <div class="stat-value"><?= $moderatorStats['total_assigned_users'] ?></div>
+                    <div class="stat-label">Assigned Users</div>
+                </div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="stats-card">
-                <div class="h3 mb-1"><?= $moderatorStats['total_moderators'] - $moderatorStats['active_moderators'] ?></div>
-                <div class="small">Inactive</div>
+            <div class="stat-box">
+                <div class="stat-icon" style="background-color: rgba(239, 68, 68, 0.1); color: #ef4444;">
+                    <i class="fas fa-user-times"></i>
+                </div>
+                <div class="stat-details">
+                    <div class="stat-value"><?= $moderatorStats['total_moderators'] - $moderatorStats['active_moderators'] ?></div>
+                    <div class="stat-label">Inactive</div>
+                </div>
             </div>
         </div>
     </div>
@@ -663,7 +718,7 @@ $departments = $conn->query("SELECT DISTINCT department FROM users WHERE role = 
     <!-- Moderators Table -->
     <div class="row fade-in">
         <div class="col-12">
-            <div class="moderator-card">
+            <div class="dashboard-card">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="mb-0">
                         <i class="fas fa-list"></i> Moderators List

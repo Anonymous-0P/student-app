@@ -144,6 +144,14 @@ $result = $stmt->get_result();
                                            class="btn btn-sm btn-outline-primary" title="View PDF">
                                             📄 View
                                         </a>
+                                        <?php if(!empty($row['annotated_pdf_url']) && file_exists('../' . $row['annotated_pdf_url'])): ?>
+                                            <a href="../<?= htmlspecialchars($row['annotated_pdf_url']) ?>" 
+                                               target="_blank"
+                                               class="btn btn-sm btn-success" 
+                                               title="Download Annotated Answer Sheet">
+                                                ✓ Evaluated
+                                            </a>
+                                        <?php endif; ?>
                                         <?php if($row['evaluator_remarks']): ?>
                                             <button class="btn btn-sm btn-outline-info" 
                                                     onclick="showEvaluationFeedback('<?= htmlspecialchars(addslashes($row['evaluator_remarks'])) ?>', '<?= htmlspecialchars($row['subject_code']) ?>', '<?= number_format($percentage, 1) ?>%', '<?= $grade ?>')"
@@ -280,6 +288,14 @@ $result = $stmt->get_result();
                                    class="btn btn-outline-primary">
                                     <i class="fas fa-file-pdf me-2"></i>View PDF
                                 </a>
+                                
+                                <?php if(!empty($row['annotated_pdf_url']) && file_exists('../' . $row['annotated_pdf_url'])): ?>
+                                    <a href="../<?= htmlspecialchars($row['annotated_pdf_url']) ?>" 
+                                       target="_blank"
+                                       class="btn btn-success">
+                                        <i class="fas fa-check-circle me-2"></i>Download Annotated Answer Sheet
+                                    </a>
+                                <?php endif; ?>
                                 
                                 <?php if($row['evaluator_remarks'] || $row['marks_obtained'] !== null): ?>
                                     <div class="row g-2">

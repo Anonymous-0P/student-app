@@ -61,116 +61,16 @@ $acceptedAssignments = $acceptedStmt->fetchAll(PDO::FETCH_ASSOC);
 include '../includes/header.php';
 ?>
 
-<style>
-.assignment-card {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    transition: all 0.3s ease;
-    border-left: 4px solid #667eea;
-    margin-bottom: 1.5rem;
-}
+<link href="css/evaluator-style.css" rel="stylesheet">
 
-.assignment-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-}
-
-.assignment-card.pending {
-    border-left-color: #ffc107;
-}
-
-.assignment-card.accepted {
-    border-left-color: #28a745;
-}
-
-.stat-widget {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 15px;
-    padding: 1.5rem;
-    color: white;
-    text-align: center;
-    position: relative;
-    overflow: hidden;
-}
-
-.stat-widget::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 80px;
-    height: 80px;
-    background: rgba(255,255,255,0.1);
-    border-radius: 50%;
-    transform: translate(30%, -30%);
-}
-
-.btn-accept {
-    background: linear-gradient(135deg, #28a745, #20c997);
-    border: none;
-    color: white;
-}
-
-.btn-deny {
-    background: linear-gradient(135deg, #dc3545, #fd7e14);
-    border: none;
-    color: white;
-}
-
-.btn-accept:hover, .btn-deny:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
-    color: white;
-}
-
-.badge-pending {
-    background: linear-gradient(135deg, #ffc107, #fd7e14);
-}
-
-.badge-accepted {
-    background: linear-gradient(135deg, #28a745, #20c997);
-}
-
-.badge-completed {
-    background: linear-gradient(135deg, #6f42c1, #007bff);
-}
-
-.assignment-card.completed {
-    border-left-color: #6f42c1;
-    background: linear-gradient(135deg, rgba(111, 66, 193, 0.05), rgba(0, 123, 255, 0.05));
-}
-
-.file-info {
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 1rem;
-    margin: 1rem 0;
-}
-
-.modal-assignment {
-    backdrop-filter: blur(10px);
-}
-</style>
-
+<div class="evaluator-content">
 <div class="container-fluid">
     <!-- Header -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h1 class="h3 mb-2"><i class="fas fa-tasks text-primary"></i> Assignment Management</h1>
-                    <p class="text-muted mb-0">Manage your evaluation assignments</p>
-                </div>
-                <!-- <div class="d-flex gap-2">
-                    <a href="dashboard.php" class="btn btn-outline-primary">
-                        <i class="fas fa-tachometer-alt"></i> Dashboard
-                    </a>
-                    <a href="pending_evaluations.php" class="btn btn-primary">
-                        <i class="fas fa-clock"></i> Evaluations
-                    </a>
-                </div> -->
+    <div class="page-header">
+        <div class="row">
+            <div class="col-12">
+                <h1><i class="fas fa-tasks me-2"></i>Assignment Management</h1>
+                <p>Manage your evaluation assignments</p>
             </div>
         </div>
     </div>
@@ -181,20 +81,20 @@ include '../includes/header.php';
     <!-- Legacy PDF Assignments - Pending -->
     <div class="row mb-4">
         <div class="col-12">
-            <h4 class="mb-3">
-                <i class="fas fa-hourglass-half text-warning"></i> 
-                Pending Answersheet Submissions
-                <span class="badge bg-warning"><?= count($pendingAssignments) ?></span>
-            </h4>
+            <div class="dashboard-card">
+                <h5>
+                    <i class="fas fa-hourglass-half me-2"></i>Pending Answersheet Submissions
+                    <span class="badge bg-warning"><?= count($pendingAssignments) ?></span>
+                </h5>
             <?php if (!empty($pendingAssignments)): ?>
                 <?php foreach ($pendingAssignments as $assignment): ?>
-                    <div class="assignment-card pending">
+                    <div class="assignment-card">
                         <div class="row align-items-center">
                             <div class="col-md-6">
-                                <h5 class="mb-2">
-                                    <span class="badge badge-pending">PENDING</span>
+                                <h6 class="mb-2">
+                                    <span class="badge bg-warning">PENDING</span>
                                     <?= htmlspecialchars($assignment['subject_code']) ?> - <?= htmlspecialchars($assignment['subject_name']) ?>
-                                </h5>
+                                </h6>
                                 <div class="mb-2">
                                     <strong>Student:</strong> <?= htmlspecialchars($assignment['student_name']) ?>
                                 </div>
@@ -222,12 +122,12 @@ include '../includes/header.php';
                                 </div>
                             </div> -->
                             <div class="col-md-3 text-end">
-                                <div class="d-grid gap-2">
-                                    <button class="btn btn-accept" onclick="handleAssignment(<?= $assignment['assignment_id'] ?>, 'accept')">
-                                        <i class="fas fa-check"></i> Accept Assignment
+                                <div class="btn-group">
+                                    <button class="btn btn-success btn-sm" onclick="handleAssignment(<?= $assignment['assignment_id'] ?>, 'accept')">
+                                        <i class="fas fa-check"></i> Accept
                                     </button>
-                                    <button class="btn btn-deny" onclick="handleAssignment(<?= $assignment['assignment_id'] ?>, 'deny')">
-                                        <i class="fas fa-times"></i> Decline Assignment
+                                    <button class="btn btn-danger btn-sm" onclick="handleAssignment(<?= $assignment['assignment_id'] ?>, 'deny')">
+                                        <i class="fas fa-times"></i> Decline
                                     </button>
                                     <button class="btn btn-outline-secondary btn-sm" onclick="showDetails(<?= $assignment['assignment_id'] ?>, '<?= htmlspecialchars($assignment['student_name']) ?>', '<?= htmlspecialchars($assignment['subject_code']) ?>')">
                                         <i class="fas fa-info-circle"></i> Details
@@ -238,38 +138,36 @@ include '../includes/header.php';
                     </div>
                 <?php endforeach; ?>
             <?php else: ?>
-                <div class="assignment-card">
-                    <div class="text-center py-4">
-                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
-                        <h5 class="text-muted">No Pending PDF Assignments</h5>
-                        <p class="text-muted">You have no pending PDF assignment requests at the moment.</p>
-                    </div>
+                <div class="text-center py-4">
+                    <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">No pending assignments at the moment.</p>
                 </div>
             <?php endif; ?>
+            </div>
         </div>
     </div>
 
     <!-- Legacy PDF Assignments - Accepted -->
     <div class="row">
         <div class="col-12">
-            <h4 class="mb-3">
-                <i class="fas fa-tasks text-success"></i> 
-                Evaluation Answersheet
-                <span class="badge bg-success"><?= count($acceptedAssignments) ?></span>
-            </h4>
+            <div class="dashboard-card">
+                <h5>
+                    <i class="fas fa-tasks me-2"></i>Evaluation Answersheet
+                    <span class="badge bg-success"><?= count($acceptedAssignments) ?></span>
+                </h5>
             <?php if (!empty($acceptedAssignments)): ?>
                 <?php foreach ($acceptedAssignments as $assignment): ?>
-                    <div class="assignment-card <?= $assignment['evaluation_status'] === 'completed' ? 'completed' : 'accepted' ?>">
+                    <div class="assignment-card">
                         <div class="row align-items-center">
                             <div class="col-md-6">
-                                <h5 class="mb-2">
+                                <h6 class="mb-2">
                                     <?php if ($assignment['evaluation_status'] === 'completed'): ?>
-                                        <span class="badge badge-completed">COMPLETED</span>
+                                        <span class="badge bg-success">COMPLETED</span>
                                     <?php else: ?>
-                                        <span class="badge badge-accepted">IN PROGRESS</span>
+                                        <span class="badge bg-info">IN PROGRESS</span>
                                     <?php endif; ?>
                                     <?= htmlspecialchars($assignment['subject_code']) ?> - <?= htmlspecialchars($assignment['subject_name']) ?>
-                                </h5>
+                                </h6>
                                 <div class="mb-2">
                                     <strong>Student:</strong> <?= htmlspecialchars($assignment['student_name']) ?>
                                 </div>
@@ -323,26 +221,18 @@ include '../includes/header.php';
                                 </div> -->
                             </div>
                             <div class="col-md-3 text-end">
-                                <div class="d-grid gap-2">
+                                <div class="btn-group">
                                     <?php if ($assignment['evaluation_status'] === 'completed'): ?>
-                                        <a href="evaluate.php?id=<?= $assignment['submission_id'] ?>" class="btn btn-success">
-                                            <i class="fas fa-check-circle"></i> View Completed Evaluation
+                                        <a href="evaluate.php?id=<?= $assignment['submission_id'] ?>" class="btn btn-success btn-sm">
+                                            <i class="fas fa-eye"></i> View
                                         </a>
                                         <button class="btn btn-outline-success btn-sm" onclick="showEvaluationSummary(<?= $assignment['assignment_id'] ?>)">
-                                            <i class="fas fa-eye"></i> View Summary
+                                            <i class="fas fa-chart-bar"></i> Summary
                                         </button>
-                                        <div class="small text-success mt-1">
-                                            <i class="fas fa-calendar-check"></i> 
-                                            Evaluation Completed
-                                        </div>
                                     <?php else: ?>
-                                        <a href="evaluate.php?id=<?= $assignment['submission_id'] ?>" class="btn btn-primary">
-                                            <i class="fas fa-edit"></i> Continue Evaluation
+                                        <a href="evaluate.php?id=<?= $assignment['submission_id'] ?>" class="btn btn-primary btn-sm">
+                                            <i class="fas fa-edit"></i> Continue
                                         </a>
-                                        <div class="small text-info mt-1">
-                                            <i class="fas fa-clock"></i> 
-                                            Evaluation in Progress
-                                        </div>
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -350,16 +240,15 @@ include '../includes/header.php';
                     </div>
                 <?php endforeach; ?>
             <?php else: ?>
-                <div class="assignment-card">
-                    <div class="text-center py-4">
-                        <i class="fas fa-tasks fa-3x text-muted mb-3"></i>
-                        <h5 class="text-muted">No Accepted PDF Assignments</h5>
-                        <p class="text-muted">You haven't accepted any PDF assignments yet.</p>
-                    </div>
+                <div class="text-center py-4">
+                    <i class="fas fa-tasks fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">No accepted assignments yet.</p>
                 </div>
             <?php endif; ?>
+            </div>
         </div>
     </div>
+</div>
 </div>
 
 <!-- Assignment Action Modal -->

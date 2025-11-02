@@ -20,9 +20,6 @@ if ($user_info['year']) {
             $grade_level = '10th';
             break;
         case 2:
-            $grade_level = '11th';
-            break;
-        case 3:
             $grade_level = '12th';
             break;
     }
@@ -74,7 +71,7 @@ $papersQuery = "SELECT qp.*, s.code as subject_code, s.name as subject_name, s.p
                 FROM question_papers qp
                 LEFT JOIN subjects s ON qp.subject_id = s.id
                 WHERE $where_clause
-                ORDER BY qp.created_at DESC";
+                ORDER BY has_access DESC, qp.created_at DESC";
 
 $papersStmt = $conn->prepare($papersQuery);
 $all_params = array_merge([$student_id, $student_id], $params);
@@ -97,105 +94,226 @@ $pageTitle = "Question Papers";
 require_once('../includes/header.php');
 ?>
 
+<link rel="stylesheet" href="../moderator/css/moderator-style.css">
+
 <style>
+/* Additional custom styles for question papers page */
+.question-papers-content {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: #ffffff;
+    color: var(--text-dark);
+    line-height: 1.6;
+}
+
 .paper-card {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    transition: all 0.3s ease;
-    border-left: 4px solid #667eea;
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    transition: all 0.2s;
     height: 100%;
 }
 
 .paper-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .paper-card.downloaded {
-    border-left-color: #28a745;
-    background: linear-gradient(135deg, #f8fff9 0%, #ffffff 100%);
+    border-left: 3px solid var(--success-color);
 }
 
-.grade-badge {
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    color: white;
-    padding: 0.25rem 0.75rem;
-    border-radius: 20px;
+.paper-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 1rem;
+}
+
+.paper-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 0.5rem;
+}
+
+.paper-subject {
     font-size: 0.875rem;
-    font-weight: 500;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
 }
 
-.exam-type-badge {
-    background: #f8f9fa;
-    color: #495057;
-    padding: 0.25rem 0.5rem;
-    border-radius: 15px;
-    font-size: 0.75rem;
-    border: 1px solid #e9ecef;
+.paper-meta {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
 }
 
-.stats-widget {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 15px;
-    padding: 1.5rem;
-    color: white;
-    text-align: center;
+/* Override badge colors to have white text */
+.badge.bg-primary,
+.badge.bg-success,
+.badge.bg-warning,
+.badge.bg-danger,
+.badge.bg-info,
+.badge.bg-secondary {
+    color: white !important;
 }
 
-.btn-download {
-    background: linear-gradient(135deg, #007bff, #0056b3);
-    border: none;
-    color: white;
-    padding: 0.5rem 1rem;
-    border-radius: 8px;
-    transition: all 0.3s ease;
+.badge.bg-primary { 
+    background: var(--primary-color) !important;
 }
 
-.btn-download:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
-    color: white;
+.badge.bg-success { 
+    background: var(--success-color) !important;
 }
 
-.btn-downloaded {
-    background: #6c757d;
-    border: none;
-    color: white;
-    padding: 0.5rem 1rem;
-    border-radius: 8px;
+.badge.bg-warning { 
+    background: var(--warning-color) !important;
 }
 
-.filter-card {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+.badge.bg-danger { 
+    background: var(--danger-color) !important;
+}
+
+.badge.bg-info { 
+    background: #0ea5e9 !important;
+}
+
+.badge.bg-secondary { 
+    background: #6b7280 !important;
+}
+
+.paper-description {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+    line-height: 1.5;
+}
+
+.paper-instructions {
+    background: var(--bg-light);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.75rem;
+    font-size: 0.8125rem;
+    margin-bottom: 1rem;
+}
+
+.paper-instructions strong {
+    color: var(--text-dark);
+}
+
+.paper-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.stat-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
     margin-bottom: 2rem;
 }
 
-.fade-in {
-    animation: fadeIn 0.6s ease-out;
+.stat-card-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+.stat-icon-wrapper {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+}
+
+.stat-icon-wrapper.primary {
+    background: #dbeafe;
+    color: var(--primary-color);
+}
+
+.stat-icon-wrapper.success {
+    background: #dcfce7;
+    color: var(--success-color);
+}
+
+.stat-icon-wrapper.warning {
+    background: #fef3c7;
+    color: var(--warning-color);
+}
+
+.stat-icon-wrapper.info {
+    background: #dbeafe;
+    color: #0ea5e9;
+}
+
+.stat-details h4 {
+    font-size: 1.75rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.stat-details small {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.papers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+}
+
+.empty-papers {
+    text-align: center;
+    padding: 3rem 1rem;
+}
+
+.empty-papers i {
+    font-size: 3rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+}
+
+.empty-papers h5 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 0.5rem;
+}
+
+.empty-papers p {
+    color: var(--text-muted);
+}
+
+@media (max-width: 768px) {
+    .papers-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .stat-cards {
+        grid-template-columns: 1fr;
+    }
 }
 </style>
 
-<div class="container-fluid">
-    <!-- Header -->
-    <div class="row mb-4 fade-in">
-        <div class="col-12">
+<div class="question-papers-content">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="container">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <h1 class="h3 mb-2"><i class="fas fa-file-alt text-primary"></i> Question Papers</h1>
-                    <p class="text-muted mb-0">View question papers for practice and preparation</p>
+                    <h1><i class="fas fa-file-alt"></i> Question Papers</h1>
+                    <p>View question papers for practice and preparation</p>
                 </div>
                 <div>
-                    <a href="dashboard.php" class="btn btn-outline-primary">
+                    <a href="dashboard.php" class="btn btn-outline-secondary">
                         <i class="fas fa-arrow-left"></i> Back to Dashboard
                     </a>
                 </div>
@@ -203,29 +321,8 @@ require_once('../includes/header.php');
         </div>
     </div>
 
-    <!-- Stats -->
-    <div class="row g-4 mb-4">
-        <?php
-        $statsQuery = "SELECT 
-            COUNT(*) as total_papers,
-            COUNT(CASE WHEN exam_type = 'practice' THEN 1 END) as practice_papers,
-            COUNT(CASE WHEN exam_type IN ('unit_test', 'mid_term', 'final') THEN 1 END) as exam_papers,
-            (SELECT COUNT(*) FROM question_paper_downloads WHERE student_id = ?) as my_downloads
-            FROM question_papers qp WHERE qp.is_active = 1";
-        
-        if ($grade_level) {
-            $statsQuery .= " AND qp.grade_level = '$grade_level'";
-        }
-        
-        $statsStmt = $conn->prepare($statsQuery);
-        $statsStmt->bind_param("i", $student_id);
-        $statsStmt->execute();
-        $stats = $statsStmt->get_result()->fetch_assoc();
-        ?>
-        
-        
-
-    <!-- Filters -->
+    <div class="container">
+        <!-- Filters -->
     <!-- <div class="row mb-4">
         <div class="col-12">
             <div class="filter-card fade-in" style="animation-delay: 0.5s;">
@@ -257,89 +354,68 @@ require_once('../includes/header.php');
         </div>
     </div> -->
 
-    <!-- Question Papers List -->
-    <div class="row mt-4">
-        <?php if ($papers->num_rows === 0): ?>
-            <div class="col-12">
-                <div class="text-center py-5">
-                    <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
-                    <h5 class="text-muted">No Question Papers Available</h5>
-                    <p class="text-muted">Check back later for new papers or adjust your filters.</p>
-                </div>
+        <!-- Question Papers List -->
+        <div class="dashboard-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0"><i class="fas fa-file-alt"></i> Available Question Papers</h5>
             </div>
-        <?php else: ?>
-            <?php $delay = 0.6; while ($paper = $papers->fetch_assoc()): $delay += 0.1; ?>
-                <div class="col-md-6 col-lg-4 mb-4 fade-in" style="animation-delay: <?= $delay ?>s;">
-                    <div class="paper-card <?= $paper['downloaded_by_student'] > 0 ? 'downloaded' : '' ?>">
-                        <div class="d-flex justify-content-between align-items-start mb-3">
-                            <span class="grade-badge"><?= $paper['grade_level'] ?></span>
-                           
-                        </div>
-
-                        <h5 class="mb-2"><?= htmlspecialchars($paper['title']) ?></h5>
-                        
-                        <div class="mb-2">
-                            <small class="text-muted">
-                                <i class="fas fa-book"></i> <?= htmlspecialchars($paper['subject_code']) ?> - <?= htmlspecialchars($paper['subject_name']) ?>
-                            </small>
-                        </div>
-
-                        <div class="d-flex gap-2 mb-3 flex-wrap">
-                            <span class="exam-type-badge"><?= $paper['marks'] ?> marks</span>
-                            <span class="exam-type-badge"><?= $paper['duration_minutes'] ?>m</span>
-                        </div>
-
-                        <?php if ($paper['description']): ?>
-                            <p class="text-muted small mb-3"><?= htmlspecialchars(substr($paper['description'], 0, 100)) ?><?= strlen($paper['description']) > 100 ? '...' : '' ?></p>
-                        <?php endif; ?>
-
-                        <?php if ($paper['instructions']): ?>
-                            <div class="alert alert-light py-2 px-3 mb-3">
-                                <small><strong>Instructions:</strong> <?= htmlspecialchars(substr($paper['instructions'], 0, 80)) ?><?= strlen($paper['instructions']) > 80 ? '...' : '' ?></small>
+            
+            <?php if ($papers->num_rows === 0): ?>
+                <div class="empty-papers">
+                    <i class="fas fa-file-alt"></i>
+                    <h5>No Question Papers Available</h5>
+                    <p>Check back later for new papers or adjust your filters.</p>
+                </div>
+            <?php else: ?>
+                <div class="papers-grid">
+                    <?php while ($paper = $papers->fetch_assoc()): ?>
+                        <div class="paper-card">
+                            <div class="paper-header">
+                                <span class="badge bg-primary"><?= htmlspecialchars($paper['grade_level']) ?></span>
                             </div>
-                        <?php endif; ?>
 
-                       
+                            <h6 class="paper-title"><?= htmlspecialchars($paper['title']) ?></h6>
+                            
+                            <div class="paper-subject">
+                                <i class="fas fa-book"></i> <?= htmlspecialchars($paper['subject_code']) ?> - <?= htmlspecialchars($paper['subject_name']) ?>
+                            </div>
 
-                        <div class="d-grid">
-                            <?php if ($paper['has_access'] > 0): ?>
-                                <a href="pdf_viewer.php?paper_id=<?= $paper['id'] ?>" class="btn-download text-decoration-none">
-                                    <i class="fas fa-eye"></i> View Paper
-                                </a>
-                                <div class="mt-2">
-                                    <small class="text-success">
-                                        <i class="fas fa-check-circle"></i> Access granted
-                                    </small>
-                                </div>
-                            <?php else: ?>
-                                <button class="btn btn-outline-danger w-100" onclick="showPurchaseModal('<?= htmlspecialchars($paper['subject_code']) ?>', '<?= htmlspecialchars($paper['subject_name']) ?>', <?= $paper['subject_id'] ?>, <?= $paper['price'] ?? 0 ?>)">
-                                    <i class="fas fa-lock"></i> Purchase Required
-                                </button>
-                                <div class="mt-2">
-                                    <small class="text-muted">
-                                        <i class="fas fa-shopping-cart"></i> Price: $<?= number_format($paper['price'] ?? 0, 2) ?>
-                                    </small>
+                            <div class="paper-meta">
+                                <span class="badge bg-secondary"><?= $paper['marks'] ?> marks</span>
+                                <span class="badge bg-secondary"><?= $paper['duration_minutes'] ?>m</span>
+                            </div>
+
+                            <?php if ($paper['description']): ?>
+                                <p class="paper-description"><?= htmlspecialchars(substr($paper['description'], 0, 100)) ?><?= strlen($paper['description']) > 100 ? '...' : '' ?></p>
+                            <?php endif; ?>
+
+                            <?php if ($paper['instructions']): ?>
+                                <div class="paper-instructions">
+                                    <strong>Instructions:</strong> <?= htmlspecialchars(substr($paper['instructions'], 0, 80)) ?><?= strlen($paper['instructions']) > 80 ? '...' : '' ?>
                                 </div>
                             <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
-            <?php endwhile; ?>
-        <?php endif; ?>
-    </div>
 
-    <!-- Help Text -->
-    <div class="row mt-4">
-        <div class="col-12">
-            <div class="alert alert-info">
-                <h6><i class="fas fa-info-circle"></i> How to use question papers:</h6>
-                <ul class="mb-0">
-                    <li><strong>Purchase Access:</strong> You need to purchase a subject to access its question papers and attend exams</li>
-                    <li><strong>View Papers:</strong> Once purchased, click "View Paper" to access question papers</li>
-                    <li><strong>Practice:</strong> Solve questions within the time limit and upload your answer sheets</li>
-                    <li><strong>Get Evaluated:</strong> Wait for evaluation and feedback from your evaluator</li>
-                </ul>
-            </div>
+                            <div class="paper-actions">
+                                <?php if ($paper['has_access'] > 0): ?>
+                                    <a href="pdf_viewer.php?paper_id=<?= $paper['id'] ?>" class="btn btn-primary">
+                                        <i class="fas fa-eye"></i> View Paper
+                                    </a>
+                                    <small class="text-success text-center">
+                                        <i class="fas fa-check-circle"></i> Access granted
+                                    </small>
+                                <?php else: ?>
+                                    <button class="btn btn-outline-danger" onclick="showPurchaseModal('<?= htmlspecialchars($paper['subject_code']) ?>', '<?= htmlspecialchars($paper['subject_name']) ?>', <?= $paper['subject_id'] ?>, <?= $paper['price'] ?? 0 ?>)">
+                                        <i class="fas fa-lock"></i> Purchase Required
+                                    </button>
+                                    <small class="text-muted text-center">
+                                        <i class="fas fa-shopping-cart"></i> Price: ₹<?= number_format($paper['price'] ?? 0, 2) ?>
+                                    </small>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    <?php endwhile; ?>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>
@@ -347,46 +423,44 @@ require_once('../includes/header.php');
 <!-- Purchase Modal -->
 <div class="modal fade" id="purchaseModal" tabindex="-1" aria-labelledby="purchaseModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="purchaseModalLabel">
-                    <i class="fas fa-shopping-cart text-primary"></i> Purchase Required
+        <div class="modal-content" style="border: 1px solid var(--border-color); border-radius: 8px;">
+            <div class="modal-header" style="background: white; border-bottom: 1px solid var(--border-color);">
+                <h5 class="modal-title" id="purchaseModalLabel" style="font-weight: 600; color: var(--text-dark);">
+                    <i class="fas fa-shopping-cart" style="color: var(--primary-color);"></i> Purchase Required
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body" style="padding: 1.5rem;">
                 <div class="text-center mb-4">
-                    <i class="fas fa-lock fa-3x text-warning mb-3"></i>
-                    <h6>Access Restricted</h6>
-                    <p class="text-muted">You need to purchase this subject to access question papers and attend exams.</p>
+                    <div style="width: 64px; height: 64px; margin: 0 auto 1rem; background: #fef3c7; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-lock" style="font-size: 2rem; color: var(--warning-color);"></i>
+                    </div>
+                    <h6 style="font-weight: 600; color: var(--text-dark); margin-bottom: 0.5rem;">Access Restricted</h6>
+                    <p class="text-muted" style="font-size: 0.875rem;">You need to purchase this subject to access question papers and attend exams.</p>
                 </div>
                 
-                <div class="card border-0 bg-light">
-                    <div class="card-body">
-                        <div class="row align-items-center">
-                            <div class="col-8">
-                                <h6 class="mb-1" id="subjectDetails">Subject Name</h6>
-                                <small class="text-muted" id="subjectCode">Subject Code</small>
-                            </div>
-                            <div class="col-4 text-end">
-                                <div class="h5 text-success mb-0" id="subjectPrice">$0.00</div>
-                                <small class="text-muted">Price</small>
-                            </div>
+                <div style="background: var(--bg-light); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem;">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1" id="subjectDetails" style="font-weight: 600; color: var(--text-dark);">Subject Name</h6>
+                            <small class="text-muted" id="subjectCode">Subject Code</small>
+                        </div>
+                        <div class="text-end">
+                            <div class="h5 mb-0" id="subjectPrice" style="color: var(--success-color); font-weight: 700;">₹0.00</div>
+                            <small class="text-muted">Price</small>
                         </div>
                     </div>
                 </div>
                 
-                <div class="alert alert-info mt-3">
-                    <small>
-                        <i class="fas fa-info-circle me-1"></i>
-                        <strong>What you get:</strong> Access to all question papers, practice tests, and ability to attend exams for this subject.
-                    </small>
+                <div class="alert alert-info mt-3" style="font-size: 0.875rem;">
+                    <i class="fas fa-info-circle me-1"></i>
+                    <strong>What you get:</strong> Access to all question papers, practice tests, and ability to attend exams for this subject.
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <div class="modal-footer" style="background: var(--bg-light); border-top: 1px solid var(--border-color);">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
                 <a href="#" id="browseExamsBtn" class="btn btn-primary">
-                    <i class="fas fa-shopping-cart me-2"></i>Go to Purchase
+                    <i class="fas fa-shopping-cart"></i> Go to Purchase
                 </a>
             </div>
         </div>
@@ -417,7 +491,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function showPurchaseModal(subjectCode, subjectName, subjectId, price) {
     document.getElementById('subjectCode').textContent = subjectCode;
     document.getElementById('subjectDetails').textContent = subjectName;
-    document.getElementById('subjectPrice').textContent = '$' + parseFloat(price).toFixed(2);
+    document.getElementById('subjectPrice').textContent = '₹' + parseFloat(price).toFixed(2);
     document.getElementById('browseExamsBtn').href = 'browse_exams.php?subject_id=' + subjectId;
     
     const modal = new bootstrap.Modal(document.getElementById('purchaseModal'));

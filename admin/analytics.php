@@ -127,35 +127,9 @@ $systemHealth = $systemHealthQuery ? $systemHealthQuery->fetch_assoc() : [
 ];
 ?>
 
+<link rel="stylesheet" href="../moderator/css/moderator-style.css">
+
 <style>
-.analytics-card {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    transition: all 0.3s ease;
-    border: none;
-    margin-bottom: 1rem;
-}
-
-.analytics-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-}
-
-.metric-card {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-radius: 15px;
-    padding: 1.5rem;
-    text-align: center;
-    transition: transform 0.3s ease;
-    height: 100%;
-}
-
-.metric-card:hover {
-    transform: translateY(-5px);
-}
 
 .chart-container {
     position: relative;
@@ -194,36 +168,27 @@ $systemHealth = $systemHealthQuery ? $systemHealthQuery->fetch_assoc() : [
     transition: width 0.3s ease;
 }
 
-.performance-excellent { background: linear-gradient(90deg, #28a745, #20c997); }
-.performance-good { background: linear-gradient(90deg, #20c997, #17a2b8); }
-.performance-average { background: linear-gradient(90deg, #ffc107, #fd7e14); }
-.performance-poor { background: linear-gradient(90deg, #fd7e14, #dc3545); }
+.performance-excellent { background: var(--success-color); }
+.performance-good { background: #10b981; }
+.performance-average { background: var(--warning-color); }
+.performance-poor { background: var(--danger-color); }
 
 .fade-in {
-    animation: fadeIn 0.6s ease-out;
+    animation: fadeIn 0.4s ease-out;
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
+    from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
-.export-btn {
-    background: linear-gradient(135deg, #28a745, #20c997);
-    border: none;
-    color: white;
-    padding: 0.5rem 1rem;
-    border-radius: 8px;
-    transition: transform 0.3s ease;
-}
-
-.export-btn:hover {
-    transform: translateY(-2px);
-    color: white;
+/* Ensure all badges have white text */
+.badge {
+    color: white !important;
 }
 </style>
 
-<div class="container-fluid">
+<div class="container-fluid" style="padding-left: 50px; padding-right: 50px;">
     <!-- Header -->
     <div class="row mb-4 fade-in">
         <div class="col-12">
@@ -245,7 +210,7 @@ $systemHealth = $systemHealthQuery ? $systemHealthQuery->fetch_assoc() : [
     </div>
 
     <!-- Date Range Filter -->
-    <div class="analytics-card fade-in">
+    <div class="dashboard-card fade-in">
         <form method="GET" class="row g-3 align-items-end">
             <div class="col-md-4">
                 <label class="form-label">From Date</label>
@@ -310,7 +275,7 @@ $systemHealth = $systemHealthQuery ? $systemHealthQuery->fetch_assoc() : [
         <!-- Left Column -->
         <div class="col-lg-8">
             <!-- Daily Submissions Chart -->
-            <div class="analytics-card fade-in">
+            <div class="dashboard-card fade-in">
                 <h5 class="mb-3">📈 Daily Submission Trends</h5>
                 <div class="chart-container">
                     <canvas id="submissionChart"></canvas>
@@ -318,7 +283,7 @@ $systemHealth = $systemHealthQuery ? $systemHealthQuery->fetch_assoc() : [
             </div>
 
             <!-- Subject Performance -->
-            <div class="analytics-card fade-in">
+            <div class="dashboard-card fade-in">
                 <h5 class="mb-3">📚 Subject Performance</h5>
                 <?php if(empty($subjectStats)): ?>
                     <div class="text-center py-4">
@@ -367,7 +332,7 @@ $systemHealth = $systemHealthQuery ? $systemHealthQuery->fetch_assoc() : [
             </div>
 
             <!-- Student Activity -->
-            <div class="analytics-card fade-in">
+            <div class="dashboard-card fade-in">
                 <h5 class="mb-3">👨‍🎓 Top Student Activity</h5>
                 <?php if(empty($studentStats)): ?>
                     <div class="text-center py-4">
@@ -401,7 +366,7 @@ $systemHealth = $systemHealthQuery ? $systemHealthQuery->fetch_assoc() : [
         <!-- Right Column -->
         <div class="col-lg-4">
             <!-- System Health -->
-            <div class="analytics-card fade-in">
+            <div class="dashboard-card fade-in">
                 <h5 class="mb-3">💚 System Health</h5>
                 <div class="list-group list-group-flush">
                     <div class="list-group-item d-flex justify-content-between align-items-center border-0 px-0">
@@ -443,7 +408,7 @@ $systemHealth = $systemHealthQuery ? $systemHealthQuery->fetch_assoc() : [
             </div>
 
             <!-- Evaluator Performance -->
-            <div class="analytics-card fade-in">
+            <div class="dashboard-card fade-in">
                 <h5 class="mb-3">⭐ Evaluator Performance</h5>
                 <div class="list-group list-group-flush">
                     <?php while($evaluator = $evaluatorPerformance->fetch_assoc()): ?>
@@ -464,7 +429,7 @@ $systemHealth = $systemHealthQuery ? $systemHealthQuery->fetch_assoc() : [
             </div>
 
             <!-- Quick Actions -->
-            <div class="analytics-card fade-in">
+            <div class="dashboard-card fade-in">
                 <h5 class="mb-3">⚡ Quick Actions</h5>
                 <div class="d-grid gap-2">
                     <a href="manage_users.php" class="btn btn-outline-primary">

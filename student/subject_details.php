@@ -91,7 +91,7 @@ require_once('../includes/header.php');
                             </div>
                             <div class="d-flex align-items-center mb-2">
                                 <i class="fas fa-dollar-sign text-muted me-2"></i>
-                                <span><strong>Price Paid:</strong> $<?= number_format($subject['price_paid'], 2) ?></span>
+                                <span><strong>Price Paid:</strong> ₹<?= number_format($subject['price_paid'], 2) ?></span>
                             </div>
                         </div>
                     </div>

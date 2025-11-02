@@ -1,6 +1,5 @@
 <?php
 require_once('../config/config.php');
-include('../includes/header.php');
 require_once('../includes/functions.php');
 
 // Check if user is logged in and is a moderator
@@ -9,26 +8,57 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'moderator'){
     exit();
 }
 
+include('../includes/header.php');
+
 $moderator_id = $_SESSION['user_id'];
 
 // Get evaluator parameter if passed
 $selected_evaluator_id = isset($_GET['evaluator_id']) ? (int)$_GET['evaluator_id'] : null;
 $selected_evaluator_name = isset($_GET['evaluator_name']) ? $_GET['evaluator_name'] : '';
 ?>
+<link rel="stylesheet" href="css/moderator-style.css">
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Marks Access - Moderator Panel</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        body {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            min-height: 100vh;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+<div class="moderator-content">
+<style>
+    /* Page-specific minimal styles */
+    .tab-content {
+        padding: 1.5rem 0;
+    }
+    .nav-tabs {
+        border-bottom: 2px solid var(--border-color);
+        margin-bottom: 1.5rem;
+    }
+    .nav-tabs .nav-link {
+        border: none;
+        color: var(--text-muted);
+        padding: 0.75rem 1.5rem;
+        font-weight: 500;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+    }
+    .nav-tabs .nav-link:hover {
+        color: var(--primary-color);
+        border-bottom-color: var(--primary-color);
+    }
+    .nav-tabs .nav-link.active {
+        color: var(--primary-color);
+        border-bottom-color: var(--primary-color);
+        background: none;
+    }
+    .evaluation-card {
+        background: white;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        transition: box-shadow 0.2s;
+    }
+    .evaluation-card:hover {
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    body {
+        background: #ffffff;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
         
         .main-container {
@@ -415,5 +445,7 @@ $selected_evaluator_name = isset($_GET['evaluator_name']) ? $_GET['evaluator_nam
             });
         }
     </script>
-</body>
-</html>
+
+</div><!-- Close moderator-content -->
+
+<?php include('../includes/footer.php'); ?>

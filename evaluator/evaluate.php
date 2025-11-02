@@ -77,21 +77,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_evaluation']))
             // Process per-question marks if provided
             $question_marks = isset($_POST['question_marks']) ? $_POST['question_marks'] : [];
             $per_question_marks_json = json_encode($question_marks);
+            
+            // Handle annotated PDF file upload
+            $annotated_pdf_path = null;
+            if (isset($_FILES['annotated_pdf']) && $_FILES['annotated_pdf']['error'] === UPLOAD_ERR_OK) {
+                $uploaded_file = $_FILES['annotated_pdf'];
+                
+                // Validate file type
+                $file_type = mime_content_type($uploaded_file['tmp_name']);
+                $allowed_types = ['application/pdf'];
+                
+                if (in_array($file_type, $allowed_types)) {
+                    // Create annotated PDFs directory if it doesn't exist
+                    $upload_dir = dirname(__DIR__) . '/uploads/annotated_pdfs';
+                    if (!is_dir($upload_dir)) {
+                        mkdir($upload_dir, 0775, true);
+                    }
+                    
+                    // Generate unique filename
+                    $filename = 'annotated_' . $submission_id . '_' . time() . '.pdf';
+                    $file_path = $upload_dir . '/' . $filename;
+                    $relative_path = 'uploads/annotated_pdfs/' . $filename;
+                    
+                    // Move uploaded file
+                    if (move_uploaded_file($uploaded_file['tmp_name'], $file_path)) {
+                        $annotated_pdf_path = $relative_path;
+                    }
+                }
+            }
     
-    // Calculate percentage and grade
-    $percentage = $max_marks > 0 ? round(($marks_obtained / $max_marks) * 100, 2) : 0;
-    $grade = 'F';
-    if ($percentage >= 90) $grade = 'A+';
-    elseif ($percentage >= 85) $grade = 'A';
-    elseif ($percentage >= 80) $grade = 'A-';
-    elseif ($percentage >= 75) $grade = 'B+';
-    elseif ($percentage >= 70) $grade = 'B';
-    elseif ($percentage >= 65) $grade = 'B-';
-    elseif ($percentage >= 60) $grade = 'C+';
-    elseif ($percentage >= 55) $grade = 'C';
-    elseif ($percentage >= 50) $grade = 'C-';
-    elseif ($percentage >= 35) $grade = 'D';
-    else $grade = 'F';
+            // Calculate percentage and grade
+            $percentage = $max_marks > 0 ? round(($marks_obtained / $max_marks) * 100, 2) : 0;
+            $grade = 'F';
+            if ($percentage >= 90) $grade = 'A+';
+            elseif ($percentage >= 85) $grade = 'A';
+            elseif ($percentage >= 80) $grade = 'A-';
+            elseif ($percentage >= 75) $grade = 'B+';
+            elseif ($percentage >= 70) $grade = 'B';
+            elseif ($percentage >= 65) $grade = 'B-';
+            elseif ($percentage >= 60) $grade = 'C+';
+            elseif ($percentage >= 55) $grade = 'C';
+            elseif ($percentage >= 50) $grade = 'C-';
+            elseif ($percentage >= 35) $grade = 'D';
+            else $grade = 'F';
     
             // Validate marks
             if ($marks_obtained < 0 || $marks_obtained > $max_marks) {
@@ -101,22 +129,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_evaluation']))
                 $conn->begin_transaction();
         
         try {
-            // Update submission with evaluation (only use existing columns)
-            $update_submission_query = "UPDATE submissions SET 
-                marks_obtained = ?, 
-                max_marks = ?, 
-                evaluator_remarks = ?, 
-                status = 'evaluated',
-                evaluation_status = 'evaluated',
-                evaluated_at = NOW(),
-                updated_at = NOW()
-                WHERE id = ?";
-            
-            $stmt = $conn->prepare($update_submission_query);
-            if (!$stmt) {
-                throw new Exception("Prepare failed for submission update: " . $conn->error);
+            // Update submission with evaluation (include annotated PDF if provided)
+            if ($annotated_pdf_path) {
+                $update_submission_query = "UPDATE submissions SET 
+                    marks_obtained = ?, 
+                    max_marks = ?, 
+                    evaluator_remarks = ?, 
+                    annotated_pdf_url = ?,
+                    status = 'evaluated',
+                    evaluation_status = 'evaluated',
+                    evaluated_at = NOW(),
+                    updated_at = NOW()
+                    WHERE id = ?";
+                
+                $stmt = $conn->prepare($update_submission_query);
+                if (!$stmt) {
+                    throw new Exception("Prepare failed for submission update: " . $conn->error);
+                }
+                $stmt->bind_param("ddssi", $marks_obtained, $max_marks, $evaluator_remarks, $annotated_pdf_path, $submission_id);
+            } else {
+                $update_submission_query = "UPDATE submissions SET 
+                    marks_obtained = ?, 
+                    max_marks = ?, 
+                    evaluator_remarks = ?, 
+                    status = 'evaluated',
+                    evaluation_status = 'evaluated',
+                    evaluated_at = NOW(),
+                    updated_at = NOW()
+                    WHERE id = ?";
+                
+                $stmt = $conn->prepare($update_submission_query);
+                if (!$stmt) {
+                    throw new Exception("Prepare failed for submission update: " . $conn->error);
+                }
+                $stmt->bind_param("ddsi", $marks_obtained, $max_marks, $evaluator_remarks, $submission_id);
             }
-            $stmt->bind_param("ddsi", $marks_obtained, $max_marks, $evaluator_remarks, $submission_id);
             $stmt->execute();
             
             // Try to update additional columns if they exist
@@ -376,6 +423,9 @@ $pageTitle = "Evaluate Submission";
                 <!-- Left Panel - Submission View -->
                 <div class="col-md-8">
                     <div class="evaluation-container px-2 py-2">
+                        <!-- Download Button for Annotation -->
+                       
+                        
                         <!-- Submission Information -->
                         
 
@@ -418,7 +468,7 @@ $pageTitle = "Evaluate Submission";
                                Evaluation Form
                             </h4>
 
-                            <form method="POST" id="evaluationForm">
+                            <form method="POST" id="evaluationForm" enctype="multipart/form-data">
                                 <!-- Marks Section -->
                                 <div class="marks-breakdown">
                                     <h6 class="mb-3">
@@ -696,7 +746,6 @@ $pageTitle = "Evaluate Submission";
                                     } else {
                                         // Default/simple template for other divisions
                                         $question_templates = [
-                                            '11th' => ['count' => 10, 'max' => 10],
                                             '12th' => ['count' => 4, 'max' => 25],
                                         ];
                                         $template = $question_templates[$division] ?? ['count' => 5, 'max' => 20];
@@ -762,6 +811,44 @@ $pageTitle = "Evaluate Submission";
                                               rows="6" 
                                               placeholder="Provide detailed feedback on the submission..."
                                               required><?php echo htmlspecialchars($submission['evaluator_remarks'] ?? ''); ?></textarea>
+                                </div>
+
+                                <!-- Annotated PDF Upload -->
+                                <div class="mb-4">
+                                    <label for="annotated_pdf" class="form-label">
+                                        <strong><i class="fas fa-file-pdf me-2"></i>Upload Annotated PDF (Optional)</strong>
+                                    </label>
+                                    <div class="alert alert-info small mb-2">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        <strong>How to upload:</strong>
+                                        <ol class="mb-0 mt-1 small">
+                                            <li>Download the student's PDF above</li>
+                                            <li>Annotate it using Adobe Acrobat, Foxit, or any PDF editor</li>
+                                            <li>Upload the annotated version here</li>
+                                            <li>Student will see your annotations after submission</li>
+                                        </ol>
+                                    </div>
+                                    <div class="input-group">
+                                        <input type="file" 
+                                               class="form-control" 
+                                               id="annotated_pdf" 
+                                               name="annotated_pdf" 
+                                               accept=".pdf,application/pdf"
+                                               onchange="validatePdfFile(this)">
+                                        <label class="input-group-text" for="annotated_pdf">
+                                            <i class="fas fa-upload"></i>
+                                        </label>
+                                    </div>
+                                    <div id="pdfFileName" class="text-muted small mt-1"></div>
+                                    <?php if (!empty($submission['annotated_pdf_url']) && file_exists('../' . $submission['annotated_pdf_url'])): ?>
+                                        <div class="alert alert-success small mt-2 mb-0">
+                                            <i class="fas fa-check-circle me-1"></i>
+                                            Previously uploaded: 
+                                            <a href="../<?= htmlspecialchars($submission['annotated_pdf_url']) ?>" target="_blank" class="alert-link">
+                                                View annotated PDF
+                                            </a>
+                                        </div>
+                                    <?php endif; ?>
                                 </div>
 
                                 <!-- Evaluation Guidelines -->
@@ -962,6 +1049,39 @@ $pageTitle = "Evaluate Submission";
                 localStorage.removeItem('evaluation_draft_' + <?php echo $submission_id; ?>);
             }, 100);
         });
+        
+        // Validate PDF file upload
+        function validatePdfFile(input) {
+            const fileNameDisplay = document.getElementById('pdfFileName');
+            
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                const fileSize = file.size / 1024 / 1024; // Size in MB
+                const fileName = file.name;
+                const fileExtension = fileName.split('.').pop().toLowerCase();
+                
+                // Check file extension
+                if (fileExtension !== 'pdf') {
+                    alert('Please upload a PDF file only.');
+                    input.value = '';
+                    fileNameDisplay.textContent = '';
+                    return false;
+                }
+                
+                // Check file size (max 10MB)
+                if (fileSize > 10) {
+                    alert('File size must be less than 10MB. Your file is ' + fileSize.toFixed(2) + 'MB');
+                    input.value = '';
+                    fileNameDisplay.textContent = '';
+                    return false;
+                }
+                
+                // Display file info
+                fileNameDisplay.innerHTML = '<i class="fas fa-check-circle text-success me-1"></i>' +
+                                           '<strong>' + fileName + '</strong> (' + fileSize.toFixed(2) + ' MB)';
+                return true;
+            }
+        }
         
         // Keyboard shortcuts
         document.addEventListener('keydown', function(e) {

@@ -1,13 +1,13 @@
 <?php
 
 // DEBUG: Enable error reporting for troubleshooting
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+ini_set('display_errors', 0); // Disable display errors for AJAX to prevent HTML output
+ini_set('display_startup_errors', 0);
 error_reporting(E_ALL);
+ini_set('log_errors', 1); // Log errors instead
 
 require_once('../config/config.php');
 require_once('../includes/functions.php');
-include('../includes/header.php');
 
 checkLogin('student');
 
@@ -17,43 +17,22 @@ $maxFiles = 15;
 $allowedPdfMime = ['application/pdf'];
 $maxPdfSize = 25 * 1024 * 1024; // 25MB per submission
 
-// Get available subjects for dropdown - only purchased subjects
-$subjectsQuery = "SELECT s.id, s.code, s.name, ps.expiry_date,
-                  DATEDIFF(ps.expiry_date, CURDATE()) as days_remaining
-                  FROM subjects s
-                  JOIN purchased_subjects ps ON s.id = ps.subject_id
-                  WHERE s.is_active = 1 AND ps.student_id = ? AND ps.status = 'active' AND ps.expiry_date > CURDATE()
-                  ORDER BY s.code";
-$subjectsStmt = $conn->prepare($subjectsQuery);
-$subjectsStmt->bind_param("i", $_SESSION['user_id']);
-$subjectsStmt->execute();
-$subjectsResult = $subjectsStmt->get_result();
-
-if($_SERVER['REQUEST_METHOD'] === 'POST'){
+// Handle AJAX POST request BEFORE any HTML output
+if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['ajax'] === '1'){
     $respond = function($status, $message, $extra = []) {
         $payload = array_merge(['status' => $status, 'message' => $message], $extra);
-        if(isset($_POST['ajax']) && $_POST['ajax'] === '1') {
-            header('Content-Type: application/json');
-            echo json_encode($payload);
-            exit;
-        }
-        // Fallback for non-AJAX submissions
-        if($status === 'success') {
-            echo '<div class="alert alert-success">' . htmlspecialchars($message) . '</div>';
-        } else {
-            echo '<div class="alert alert-danger">' . htmlspecialchars($message) . '</div>';
-        }
+        header('Content-Type: application/json');
+        echo json_encode($payload);
+        exit;
     };
 
     if(!verify_csrf_token($_POST['csrf_token'] ?? '')) {
         $respond('error', 'Invalid CSRF token.');
-        return;
     }
 
     $subject_id = isset($_POST['subject_id']) ? (int)$_POST['subject_id'] : null;
     if(empty($subject_id)) {
         $respond('error', 'Please select a subject.');
-        return;
     }
 
     // Check if student has purchased access to this subject
@@ -64,23 +43,19 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
     
     if ($access_result['has_access'] == 0) {
         $respond('error', 'Access denied. You need to purchase this subject before uploading answer sheets.');
-        return;
     }
 
     if(!isset($_FILES['pdf_file'])) {
         $respond('error', 'No PDF received. Please try again.');
-        return;
     }
 
     $pdfFile = $_FILES['pdf_file'];
     if($pdfFile['error'] !== UPLOAD_ERR_OK) {
         $respond('error', 'Upload failed. Please try again.');
-        return;
     }
 
     if($pdfFile['size'] > $maxPdfSize) {
         $respond('error', 'PDF is too large. Please keep submissions under 25MB.');
-        return;
     }
 
     $finfo = finfo_open(FILEINFO_MIME_TYPE);
@@ -165,9 +140,22 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
         // Rollback transaction on error
         $conn->rollback();
         $respond('error', 'Error: ' . $e->getMessage());
-        return;
     }
 }
+
+// Get available subjects for dropdown - only purchased subjects (for HTML form display)
+$subjectsQuery = "SELECT s.id, s.code, s.name, ps.expiry_date,
+                  DATEDIFF(ps.expiry_date, CURDATE()) as days_remaining
+                  FROM subjects s
+                  JOIN purchased_subjects ps ON s.id = ps.subject_id
+                  WHERE s.is_active = 1 AND ps.student_id = ? AND ps.status = 'active' AND ps.expiry_date > CURDATE()
+                  ORDER BY s.code";
+$subjectsStmt = $conn->prepare($subjectsQuery);
+$subjectsStmt->bind_param("i", $_SESSION['user_id']);
+$subjectsStmt->execute();
+$subjectsResult = $subjectsStmt->get_result();
+
+include('../includes/header.php');
 ?>
 
 <div class="row">
@@ -546,7 +534,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: formData
             });
 
-            const result = await response.json();
+            // Get response text first
+            const responseText = await response.text();
+
+            // Check if response is OK
+            if (!response.ok) {
+                console.error('Server error:', responseText);
+                setStatus('danger', 'Server error. Please check console for details.');
+                submitBtn.disabled = false;
+                return;
+            }
+
+            // Try to parse JSON response
+            let result;
+            try {
+                result = JSON.parse(responseText);
+            } catch (jsonError) {
+                console.error('Failed to parse JSON:', jsonError);
+                console.error('Response text:', responseText);
+                setStatus('danger', 'Invalid server response. Please check console for details.');
+                submitBtn.disabled = false;
+                return;
+            }
+
             if (result.status === 'success') {
                 setStatus('success', result.message || 'Uploaded successfully.');
                 resetFormState();
@@ -559,8 +569,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 setStatus('danger', result.message || 'Upload failed. Please try again.');
             }
         } catch (error) {
-            console.error(error);
-            setStatus('danger', 'Unexpected error while uploading.');
+            console.error('Upload error:', error);
+            setStatus('danger', 'Unexpected error while uploading. Error: ' + error.message);
         } finally {
             submitBtn.disabled = false;
         }

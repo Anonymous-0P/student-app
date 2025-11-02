@@ -58,7 +58,7 @@ $marks_query = "SELECT
     FROM submissions s
     JOIN users u ON s.student_id = u.id
     LEFT JOIN subjects sub ON s.subject_id = sub.id
-    WHERE s.evaluator_id = ? AND s.status = 'evaluated' $subject_filter
+    WHERE s.evaluator_id = ? AND (s.status = 'evaluated' OR s.evaluation_status = 'evaluated') $subject_filter
     ORDER BY s.evaluated_at DESC";
 
 $marks_stmt = $conn->prepare($marks_query);
@@ -219,6 +219,46 @@ $avg_percentage = $total_max_marks > 0 ? round(($total_marks_given / $total_max_
 
 <script>
 function viewSubmissionDetails(submissionId) {
-    window.open('../student/submission_status.php?id=' + submissionId, '_blank');
+    // Open view evaluation page for moderator
+    window.open('view_evaluation.php?id=' + submissionId, '_blank');
+}
+
+function overrideMarks(submissionId, currentMarks, maxMarks) {
+    const newMarks = prompt(`Current marks: ${currentMarks}/${maxMarks}\n\nEnter new marks obtained (0-${maxMarks}):`, currentMarks);
+    
+    if (newMarks === null) return; // Cancelled
+    
+    const marks = parseFloat(newMarks);
+    if (isNaN(marks) || marks < 0 || marks > maxMarks) {
+        alert('Invalid marks. Please enter a number between 0 and ' + maxMarks);
+        return;
+    }
+    
+    const reason = prompt('Please provide a reason for overriding marks:');
+    if (!reason || reason.trim() === '') {
+        alert('Reason is required for mark override');
+        return;
+    }
+    
+    if (confirm(`Are you sure you want to override marks to ${marks}/${maxMarks}?\n\nReason: ${reason}\n\nThis action will be logged.`)) {
+        // Send override request
+        fetch('override_marks.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `submission_id=${submissionId}&new_marks=${marks}&max_marks=${maxMarks}&reason=${encodeURIComponent(reason)}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Marks updated successfully');
+                loadEvaluatorMarks(); // Reload the marks list
+            } else {
+                alert('Error: ' + (data.message || 'Failed to update marks'));
+            }
+        })
+        .catch(error => {
+            alert('Error updating marks: ' + error.message);
+        });
+    }
 }
 </script>

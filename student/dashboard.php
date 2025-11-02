@@ -92,107 +92,156 @@ $pageTitle = "Student Dashboard";
 require_once('../includes/header.php');
 ?>
 
-    <div class="container">
+<link href="css/student-style.css" rel="stylesheet">
+
+<div class="student-content">
+<div class="container">
     <!-- Welcome Header -->
-<div class="bg-primary text-white mb-4 ">
-    <div class="container">
+    <div class="page-header">
         <div class="row">
-            <div class="col-lg-8">
-                <h1 class="display-5 fw-bold mb-3">
-                    Welcome back, <?= htmlspecialchars($user_info['name']) ?>! 👋
-                </h1>
+            <div class="col-12">
+                <h1><i class="fas fa-home me-2"></i>Welcome back, <?= htmlspecialchars($user_info['name']) ?>!</h1>
+                <p>Track your progress and manage your exams</p>
             </div>
         </div>
     </div>
-</div>
-
-<div class="container">
     
     <!-- Purchased Subjects Section -->
     <?php if ($purchasedSubjects->num_rows > 0): ?>
     <div class="row mb-4">
         <div class="col-12">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="fas fa-graduation-cap text-success me-2"></i>My Purchased Subjects</h5>
+            <div class="dashboard-card">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5><i class="fas fa-graduation-cap me-2"></i>My Exams</h5>
                     <a href="browse_exams.php" class="btn btn-sm btn-outline-primary">
                         <i class="fas fa-plus"></i> Buy More
                     </a>
                 </div>
-                <div class="card-body">
-                    <div class="row">
-                        <?php while ($subject = $purchasedSubjects->fetch_assoc()): ?>
-                            <div class="col-lg-4 col-md-6 mb-3">
-                                <div class="card h-100 border">
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between align-items-start mb-2">
-                                            <h6 class="card-title text-primary mb-0"><?= htmlspecialchars($subject['code']) ?></h6>
-                                            <?php
-                                            $statusBadge = 'bg-success';
-                                            $statusText = 'Active';
-                                            if ($subject['access_status'] === 'expired') {
-                                                $statusBadge = 'bg-danger';
-                                                $statusText = 'Expired';
-                                            } elseif ($subject['access_status'] === 'expiring_soon') {
-                                                $statusBadge = 'bg-warning';
-                                                $statusText = 'Expiring Soon';
-                                            }
-                                            ?>
-                                            <span class="badge <?= $statusBadge ?> text-white"><?= $statusText ?></span>
+                    <div class="row g-3">
+                        <?php 
+                        // Get grade_level from database for each subject
+                        while ($subject = $purchasedSubjects->fetch_assoc()): 
+                            // Initialize variables
+                            $gradeLevel = null;
+                            $marks = 100;
+                            $duration = 180;
+                            
+                            // Try to get grade_level, fall back to year if column doesn't exist
+                            try {
+                                $subjectDetailsQuery = $conn->prepare("SELECT grade_level, year FROM subjects WHERE id = ?");
+                                if ($subjectDetailsQuery) {
+                                    $subjectDetailsQuery->bind_param("i", $subject['subject_id']);
+                                    $subjectDetailsQuery->execute();
+                                    $subjectDetails = $subjectDetailsQuery->get_result()->fetch_assoc();
+                                    
+                                    // Use grade_level if exists, otherwise convert year to grade
+                                    if (isset($subjectDetails['grade_level'])) {
+                                        $gradeLevel = $subjectDetails['grade_level'];
+                                    } elseif (isset($subjectDetails['year'])) {
+                                        $gradeLevel = $subjectDetails['year'] == 1 ? '10th' : ($subjectDetails['year'] == 2 ? '12th' : null);
+                                    }
+                                }
+                            } catch (Exception $e) {
+                                // If grade_level column doesn't exist, try with year only
+                                $subjectDetailsQuery = $conn->prepare("SELECT year FROM subjects WHERE id = ?");
+                                if ($subjectDetailsQuery) {
+                                    $subjectDetailsQuery->bind_param("i", $subject['subject_id']);
+                                    $subjectDetailsQuery->execute();
+                                    $subjectDetails = $subjectDetailsQuery->get_result()->fetch_assoc();
+                                    if (isset($subjectDetails['year'])) {
+                                        $gradeLevel = $subjectDetails['year'] == 1 ? '10th' : ($subjectDetails['year'] == 2 ? '12th' : null);
+                                    }
+                                }
+                            }
+                            
+                            // Query to get question paper details (marks, duration, and file info)
+                            // Get the most recent active question paper for this subject
+                            $paperQuery = $conn->prepare("SELECT id, marks, duration_minutes, file_path FROM question_papers WHERE subject_id = ? AND is_active = 1 ORDER BY created_at DESC LIMIT 1");
+                            $paperId = null;
+                            $paperFilePath = null;
+                            if ($paperQuery) {
+                                $paperQuery->bind_param("i", $subject['subject_id']);
+                                $paperQuery->execute();
+                                $paperDetails = $paperQuery->get_result()->fetch_assoc();
+                                if ($paperDetails) {
+                                    $paperId = $paperDetails['id'];
+                                    $paperFilePath = $paperDetails['file_path'];
+                                    $marks = $paperDetails['marks'] ?? 100;
+                                    $duration = $paperDetails['duration_minutes'] ?? 180;
+                                } else {
+                                    // If no question paper found, use defaults
+                                    $marks = 100;
+                                    $duration = 180;
+                                }
+                            }
+                        ?>
+                            <div class="col-lg-4 col-md-6">
+                                <div class="card h-100 shadow-sm border-0" style="border-radius: 12px; overflow: hidden;">
+                                    <!-- Grade Badge at Top -->
+                                    <?php if ($gradeLevel): ?>
+                                        <div class="px-3 pt-3">
+                                            <span class="badge rounded-pill" style="background-color: #6366f1; font-size: 0.75rem; padding: 0.4rem 0.8rem;">
+                                                <?= htmlspecialchars($gradeLevel) ?>
+                                            </span>
                                         </div>
-                                        <h6 class="card-subtitle mb-2"><?= htmlspecialchars($subject['name']) ?></h6>
-                                        <p class="card-text small text-muted">
-                                            <?= htmlspecialchars($subject['description'] ?: 'No description available.') ?>
-                                        </p>
+                                    <?php endif; ?>
+                                    
+                                    <div class="card-body d-flex flex-column">
+                                        <!-- Subject Title -->
+                                        <h5 class="card-title mb-2" style="font-size: 1.1rem; font-weight: 600;">
+                                            <?= htmlspecialchars($subject['name']) ?>
+                                        </h5>
                                         
-                                        <div class="mt-auto">
-                                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                                <small class="text-muted">
-                                                    <i class="fas fa-calendar-alt"></i> 
-                                                    <?php if ($subject['days_remaining'] > 0): ?>
-                                                        <?= $subject['days_remaining'] ?> days left
-                                                    <?php else: ?>
-                                                        Expired
-                                                    <?php endif; ?>
-                                                </small>
-                                                <small class="text-muted">
-                                                    <i class="fas fa-dollar-sign"></i> 
-                                                    <?= number_format($subject['price_paid'], 2) ?>
-                                                </small>
+                                        <!-- Subject Code -->
+                                      
+                                        <!-- Marks and Duration -->
+                                        <div class="d-flex gap-3 mb-3">
+                                            <div class="text-muted small">
+                                                <i class="fas fa-star me-1"></i><?= $marks ?> marks
                                             </div>
-                                            
+                                            <div class="text-muted small">
+                                                <i class="fas fa-clock me-1"></i><?= $duration ?>m
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Spacer -->
+                                        <div class="mt-auto">
                                             <?php if ($subject['access_status'] !== 'expired'): ?>
-                                                <div class="d-grid gap-1">
-                                                    <a href="subject_details.php?id=<?= $subject['subject_id'] ?>" 
-                                                       class="btn btn-sm btn-primary">
-                                                        <i class="fas fa-play"></i> Start Learning
+                                                <!-- View Paper Button -->
+                                                <?php if ($paperId && $paperFilePath): ?>
+                                                    <a href="pdf_viewer.php?paper_id=<?= $paperId ?>" 
+                                                       class="btn btn-primary w-100 mb-2" 
+                                                       style="border-radius: 8px; font-weight: 500;">
+                                                        <i class="fas fa-eye me-2"></i>View Paper
                                                     </a>
-                                                    <div class="row g-1">
-                                                        <div class="col-6">
-                                                            <a href="practice_tests.php?subject_id=<?= $subject['subject_id'] ?>" 
-                                                               class="btn btn-sm btn-outline-secondary w-100">
-                                                                <i class="fas fa-tasks"></i> Practice
-                                                            </a>
-                                                        </div>
-                                                        <div class="col-6">
-                                                            <a href="progress.php?subject_id=<?= $subject['subject_id'] ?>" 
-                                                               class="btn btn-sm btn-outline-info w-100">
-                                                                <i class="fas fa-chart-line"></i> Progress
-                                                            </a>
-                                                        </div>
-                                                    </div>
+                                                <?php else: ?>
+                                                    <button class="btn btn-outline-secondary w-100 mb-2" 
+                                                            disabled 
+                                                            style="border-radius: 8px; font-weight: 500;">
+                                                        <i class="fas fa-file-alt me-2"></i>No Paper Available
+                                                    </button>
+                                                <?php endif; ?>
+                                                
+                                                <!-- Access Granted Badge -->
+                                                <div class="text-center">
+                                                    <small class="text-success">
+                                                        <i class="fas fa-check-circle me-1"></i>Access granted
+                                                    </small>
                                                 </div>
                                             <?php else: ?>
-                                                <div class="d-grid">
-                                                    <button class="btn btn-sm btn-outline-secondary" disabled>
-                                                        <i class="fas fa-lock"></i> Access Expired
-                                                    </button>
+                                                <!-- Expired State -->
+                                                <button class="btn btn-outline-secondary w-100 mb-2" disabled style="border-radius: 8px;">
+                                                    <i class="fas fa-lock me-2"></i>Access Expired
+                                                </button>
+                                                <div class="text-center">
+                                                    <small class="text-danger">
+                                                        <i class="fas fa-exclamation-circle me-1"></i>Subscription ended
+                                                    </small>
                                                 </div>
                                             <?php endif; ?>
                                             
-                                            <small class="text-muted d-block mt-2">
-                                                Purchased: <?= date('M j, Y', strtotime($subject['purchase_date'])) ?>
-                                            </small>
+                                            <!-- Days Remaining -->
+                                           
                                         </div>
                                     </div>
                                 </div>
@@ -207,35 +256,31 @@ require_once('../includes/header.php');
     
     <div class="row">
         <div class="col-12 mb-4">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="fas fa-star text-warning me-2"></i>Evaluation Results</h5>
-                </div>
-                <div class="card-body">
+            <div class="dashboard-card">
+                <h5><i class="fas fa-star me-2"></i>Evaluation Results</h5>
                     <?php if ($recentEvaluations->num_rows === 0): ?>
-                        <div class="text-center py-5">
-                            <div class="text-muted mb-3 fs-1">📄</div>
-                            <h5 class="text-muted">No submissions yet</h5>
-                            <p class="text-muted px-3">Upload your first answer sheet to get started</p>
-                            <a class="btn btn-primary btn-lg" href="upload.php">
+                        <div class="text-center py-4">
+                            <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No submissions yet. Upload your first answer sheet to get started.</p>
+                            <a class="btn btn-primary" href="upload.php">
                                 <i class="fas fa-upload me-2"></i>Upload Answers
                             </a>
                         </div>
                     <?php else: ?>
                         <!-- Desktop Table View (hidden on mobile) -->
-                        <div class="table-responsive d-none d-lg-block">
-                            <table class="table align-middle mb-0">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Subject</th>
-                                        <th>Status</th>
-                                        <th>Marks & Grade</th>
-                                        <th>Evaluator</th>
-                                        <th>Submitted</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
+                        <div class="d-none d-lg-block">
+                            <table class="table">
+                                <thead>
+                                        <tr>
+                                            <th>Subject</th>
+                                            <th>Status</th>
+                                            <th>Marks & Grade</th>
+                                            <th>Evaluator</th>
+                                            <th>Submitted</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
                                 <?php 
                                 // Reset pointer for desktop table
                                 $recentEvaluations->data_seek(0);
@@ -272,7 +317,7 @@ require_once('../includes/header.php');
                                             <?php endif; ?>
                                         </td>
                                         <td>
-                                            <span class="badge <?= $statusClass ?> text-white">
+                                            <span class="badge <?= $statusClass ?>">
                                                 <?= htmlspecialchars($row['status_display']) ?>
                                             </span>
                                         </td>
@@ -306,11 +351,19 @@ require_once('../includes/header.php');
                                             <div class="small text-muted"><?= date('g:i A', strtotime($row['created_at'])) ?></div>
                                         </td>
                                         <td>
-                                            <div class="d-flex gap-1">
+                                            <div class="btn-group">
                                                 <a href="<?= htmlspecialchars($viewUrl) ?>" target="_blank" 
                                                    class="btn btn-sm btn-outline-primary" title="View PDF">
-                                                    📄 View
+                                                    <i class="fas fa-eye"></i> View
                                                 </a>
+                                                <?php if(!empty($row['annotated_pdf_url']) && file_exists('../' . $row['annotated_pdf_url'])): ?>
+                                                    <a href="../<?= htmlspecialchars($row['annotated_pdf_url']) ?>" 
+                                                       target="_blank"
+                                                       class="btn btn-sm btn-success" 
+                                                       title="Download Annotated Answer Sheet">
+                                                        <i class="fas fa-download"></i> Download
+                                                    </a>
+                                                <?php endif; ?>
                                                 <?php if($row['evaluator_remarks']): ?>
                                                     <button class="btn btn-sm btn-outline-info" 
                                                             onclick="showEvaluationFeedback('<?= htmlspecialchars(addslashes($row['evaluator_remarks'])) ?>', '<?= htmlspecialchars($row['subject_code']) ?>', '<?= number_format($percentage, 1) ?>%', '<?= $grade ?>')"
@@ -336,7 +389,7 @@ require_once('../includes/header.php');
                         </div>
                         
                         <!-- Mobile Card View (hidden on desktop) -->
-                        <div class="d-lg-none">
+                        <div class="d-block d-lg-none">
                             <?php 
                             // Reset the result pointer to display mobile cards
                             $recentEvaluationsStmt->execute();
@@ -444,39 +497,41 @@ require_once('../includes/header.php');
                                     <?php endif; ?>
                                     
                                     <!-- Action Buttons -->
-                                    <div class="d-grid gap-2">
-                                        <a href="<?= htmlspecialchars($viewUrl) ?>" target="_blank" 
-                                           class="btn btn-outline-primary">
-                                            <i class="fas fa-file-pdf me-2"></i>View PDF
-                                        </a>
-                                        
-                                        <?php if($row['evaluator_remarks'] || $row['marks_obtained'] !== null): ?>
-                                            <div class="row g-2">
-                                                <?php if($row['evaluator_remarks']): ?>
-                                                    <div class="col-6">
-                                                        <button class="btn btn-outline-info w-100" 
-                                                                onclick="showEvaluationFeedback('<?= htmlspecialchars(addslashes($row['evaluator_remarks'])) ?>', '<?= htmlspecialchars($row['subject_code']) ?>', '<?= number_format($percentage, 1) ?>%', '<?= $grade ?>')">
-                                                            <i class="fas fa-comment me-2"></i>Feedback
-                                                        </button>
-                                                    </div>
-                                                <?php endif; ?>
-                                                <?php if($row['marks_obtained'] !== null): ?>
-                                                    <div class="col-<?= $row['evaluator_remarks'] ? '6' : '12' ?>">
-                                                        <button class="btn btn-outline-success w-100" 
-                                                                onclick="showDetailedResults(<?= htmlspecialchars(json_encode($row)) ?>)">
-                                                            <i class="fas fa-chart-bar me-2"></i>Results
-                                                        </button>
-                                                    </div>
-                                                <?php endif; ?>
+                                    <div class="row g-2">
+                                        <!-- Row 1: View PDF and Download -->
+                                        <div class="col-6">
+                                            <a href="<?= htmlspecialchars($viewUrl) ?>" target="_blank" 
+                                               class="btn btn-sm btn-outline-primary w-100">
+                                                <i class="fas fa-file-pdf me-1"></i>View PDF
+                                            </a>
+                                        </div>
+                                        <?php if(!empty($row['annotated_pdf_url']) && file_exists('../' . $row['annotated_pdf_url'])): ?>
+                                            <div class="col-6">
+                                                <a href="../<?= htmlspecialchars($row['annotated_pdf_url']) ?>" 
+                                                   target="_blank"
+                                                   class="btn btn-sm btn-success w-100">
+                                                    <i class="fas fa-download me-1"></i>Download
+                                                </a>
                                             </div>
                                         <?php endif; ?>
                                         
-                                        <!-- Rating Button for Evaluated Submissions -->
+                                        <!-- Row 2: Feedback and Rate -->
+                                        <?php if($row['evaluator_remarks']): ?>
+                                            <div class="col-6">
+                                                <button class="btn btn-sm btn-outline-info w-100" 
+                                                        onclick="showEvaluationFeedback('<?= htmlspecialchars(addslashes($row['evaluator_remarks'])) ?>', '<?= htmlspecialchars($row['subject_code']) ?>', '<?= number_format($percentage, 1) ?>%', '<?= $grade ?>')">
+                                                    <i class="fas fa-comment me-1"></i>Feedback
+                                                </button>
+                                            </div>
+                                        <?php endif; ?>
+                                        
                                         <?php if($row['status_display'] == 'Evaluated' && $row['evaluator_id']): ?>
-                                            <button class="btn btn-outline-warning w-100 mt-2" 
-                                                    onclick="showRatingModal(<?= $row['evaluator_id'] ?>, '<?= htmlspecialchars($row['evaluator_name']) ?>', <?= $row['id'] ?>)">
-                                                <i class="fas fa-star me-2"></i>Rate Evaluator
-                                            </button>
+                                            <div class="col-6">
+                                                <button class="btn btn-sm btn-outline-warning w-100" 
+                                                        onclick="showRatingModal(<?= $row['evaluator_id'] ?>, '<?= htmlspecialchars($row['evaluator_name']) ?>', <?= $row['id'] ?>)">
+                                                    <i class="fas fa-star me-1"></i>Rate
+                                                </button>
+                                            </div>
                                         <?php endif; ?>
                                     </div>
                                 </div>
@@ -484,7 +539,6 @@ require_once('../includes/header.php');
                             <?php endwhile; ?>
                         </div>
                     <?php endif; ?>
-                </div>
             </div>
         </div>
     </div>
@@ -492,11 +546,8 @@ require_once('../includes/header.php');
     <!-- Quick Actions -->
     <div class="row">
         <div class="col-12 mb-4">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-light">
-                    <h5 class="mb-0"><i class="fas fa-rocket text-primary me-2"></i>Quick Actions</h5>
-                </div>
-                <div class="card-body">
+            <div class="dashboard-card">
+                <h5><i class="fas fa-rocket me-2"></i>Quick Actions</h5>
                     <div class="row g-3">
                         <div class="col-md-4">
                             <a href="browse_exams.php" class="btn btn-success btn-lg w-100">
@@ -517,7 +568,6 @@ require_once('../includes/header.php');
                             <small class="text-muted d-block mt-1">Track your progress</small>
                         </div>
                     </div>
-                </div>
             </div>
         </div>
     </div>
@@ -756,12 +806,18 @@ require_once('../includes/header.php');
 
                     <!-- Report Generation -->
                     <div class="text-center text-black mt-4">
-                        <button class="btn btn-success me-2" onclick="generateDetailedReport()">
-                            <i class="fas fa-file-pdf me-2"></i>Generate Detailed Report
-                        </button>
-                        <button class="btn btn-warning text-white" style="background: linear-gradient(90deg,#f7971e,#ffd200); border: none;" onclick="exportAnalytics()">
-                            <i class="fas fa-download me-2"></i>Export Analytics Data
-                        </button>
+                        <div class="row g-2 justify-content-center">
+                            <div class="col-6 col-md-auto">
+                                <button class="btn btn-sm btn-success w-100" onclick="generateDetailedReport()">
+                                    <i class="fas fa-file-pdf me-1"></i>Generate Report
+                                </button>
+                            </div>
+                            <div class="col-6 col-md-auto">
+                                <button class="btn btn-sm btn-warning text-white w-100" style="background: linear-gradient(90deg,#f7971e,#ffd200); border: none;" onclick="exportAnalytics()">
+                                    <i class="fas fa-download me-1"></i>Export Data
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1860,5 +1916,8 @@ function submitRating() {
     });
 }
 </script>
+
+</div>
+</div>
 
 <?php require_once('../includes/footer.php'); ?>

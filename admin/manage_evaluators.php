@@ -449,58 +449,31 @@ $departments = $conn->query("SELECT DISTINCT department FROM users WHERE role = 
 $moderators = $conn->query("SELECT id, name FROM users WHERE role = 'moderator' AND is_active = 1 ORDER BY name");
 ?>
 
+<link rel="stylesheet" href="../moderator/css/moderator-style.css">
+
 <style>
-.evaluator-card {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    transition: all 0.3s ease;
-    border: none;
-    margin-bottom: 1rem;
-}
-
-.evaluator-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-}
-
 .status-active { 
-    color: #28a745; 
+    color: var(--success-color);
     font-weight: 600; 
 }
 
 .status-inactive { 
-    color: #dc3545; 
+    color: var(--danger-color);
     font-weight: 600; 
 }
 
-.modal-content {
-    border-radius: 15px;
-    border: none;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-}
-
 .fade-in {
-    animation: fadeIn 0.6s ease-out;
+    animation: fadeIn 0.4s ease-out;
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(30px); }
+    from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
-.stats-card {
-    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-    color: white;
-    text-align: center;
-    border-radius: 12px;
-    padding: 1.5rem;
-    transition: transform 0.3s ease;
-}
-
-.stats-card:hover {
-    transform: translateY(-5px);
+/* Ensure all badges have white text */
+.badge {
+    color: white !important;
 }
 
 .btn-group-actions {
@@ -535,9 +508,10 @@ $moderators = $conn->query("SELECT id, name FROM users WHERE role = 'moderator' 
 }
 
 .search-filters {
-    background: #f8f9fa;
-    border-radius: 10px;
-    padding: 1rem;
+    background: var(--bg-light);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
     margin-bottom: 1.5rem;
 }
 
@@ -556,9 +530,9 @@ $moderators = $conn->query("SELECT id, name FROM users WHERE role = 'moderator' 
 }
 </style>
 
-<div class="container-fluid">
+<div class="container-fluid" style="padding-left: 50px; padding-right: 50px;">
     <!-- Header -->
-    <div class="row mb-4 fade-in">
+    <div class="row mb-4 mt-4 fade-in">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
@@ -591,29 +565,49 @@ $moderators = $conn->query("SELECT id, name FROM users WHERE role = 'moderator' 
     <?php endif; ?>
 
     <!-- Evaluator Statistics -->
-    <div class="row g-3 mb-4 fade-in">
+    <div class="row g-4 mb-4 fade-in">
         <div class="col-md-3">
-            <div class="stats-card">
-                <div class="h3 mb-1"><?= $evaluatorStats['active_evaluators'] ?></div>
-                <div class="small">Active Evaluators</div>
+            <div class="stat-box">
+                <div class="stat-icon" style="background-color: rgba(16, 185, 129, 0.1); color: #10b981;">
+                    <i class="fas fa-user-check"></i>
+                </div>
+                <div class="stat-details">
+                    <div class="stat-value"><?= $evaluatorStats['active_evaluators'] ?></div>
+                    <div class="stat-label">Active Evaluators</div>
+                </div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="stats-card">
-                <div class="h3 mb-1"><?= $evaluatorStats['total_departments'] ?></div>
-                <div class="small">Departments</div>
+            <div class="stat-box">
+                <div class="stat-icon" style="background-color: rgba(37, 99, 235, 0.1); color: #2563eb;">
+                    <i class="fas fa-building"></i>
+                </div>
+                <div class="stat-details">
+                    <div class="stat-value"><?= $evaluatorStats['total_departments'] ?></div>
+                    <div class="stat-label">Departments</div>
+                </div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="stats-card">
-                <div class="h3 mb-1"><?= $evaluatorStats['total_evaluations'] ?></div>
-                <div class="small">Total Evaluations</div>
+            <div class="stat-box">
+                <div class="stat-icon" style="background-color: rgba(245, 158, 11, 0.1); color: #f59e0b;">
+                    <i class="fas fa-clipboard-check"></i>
+                </div>
+                <div class="stat-details">
+                    <div class="stat-value"><?= $evaluatorStats['total_evaluations'] ?></div>
+                    <div class="stat-label">Total Evaluations</div>
+                </div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="stats-card">
-                <div class="h3 mb-1"><?= $evaluatorStats['total_evaluators'] - $evaluatorStats['active_evaluators'] ?></div>
-                <div class="small">Inactive</div>
+            <div class="stat-box">
+                <div class="stat-icon" style="background-color: rgba(239, 68, 68, 0.1); color: #ef4444;">
+                    <i class="fas fa-user-times"></i>
+                </div>
+                <div class="stat-details">
+                    <div class="stat-value"><?= $evaluatorStats['total_evaluators'] - $evaluatorStats['active_evaluators'] ?></div>
+                    <div class="stat-label">Inactive</div>
+                </div>
             </div>
         </div>
     </div>
@@ -676,7 +670,7 @@ $moderators = $conn->query("SELECT id, name FROM users WHERE role = 'moderator' 
     <!-- Evaluators Table -->
     <div class="row fade-in">
         <div class="col-12">
-            <div class="evaluator-card">
+            <div class="dashboard-card">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="mb-0">
                         <i class="fas fa-list"></i> Evaluators List

@@ -48,7 +48,7 @@ if (isset($_POST['add_to_cart']) && $is_logged_in) {
 
 // Get filter parameters
 $department_filter = $_GET['department'] ?? '';
-$year_filter = $_GET['year'] ?? '';
+$grade_filter = $_GET['grade'] ?? '';
 $price_min = $_GET['price_min'] ?? '';
 $price_max = $_GET['price_max'] ?? '';
 $search = $_GET['search'] ?? '';
@@ -71,10 +71,10 @@ if (!empty($department_filter)) {
     $types .= 's';
 }
 
-if (!empty($year_filter)) {
-    $query .= " AND s.year = ?";
-    $params[] = (int)$year_filter;
-    $types .= 'i';
+if (!empty($grade_filter)) {
+    $query .= " AND s.grade_level = ?";
+    $params[] = $grade_filter;
+    $types .= 's';
 }
 
 if (!empty($price_min)) {
@@ -98,7 +98,7 @@ if (!empty($search)) {
     $types .= 'sss';
 }
 
-$query .= " ORDER BY s.department, s.year, s.code";
+$query .= " ORDER BY s.department, s.grade_level, s.code";
 
 $stmt = $conn->prepare($query);
 $stmt->bind_param($types, ...$params);
@@ -121,201 +121,260 @@ $pageTitle = "Browse Exams";
 require_once('../includes/header.php');
 ?>
 
-<div class="container">
-    <!-- Header Section -->
-    <div class="row mb-4">
-        <div class="col-md-8">
-            <h2><i class="fas fa-books text-primary"></i> Browse Available Exams</h2>
-            <p class="text-muted">Explore our comprehensive collection of exam subjects and add them to your cart</p>
-        </div>
-        <div class="col-md-4 text-end">
-            <?php if ($is_logged_in): ?>
-                <a href="cart.php" class="btn btn-primary">
-                    <i class="fas fa-shopping-cart"></i> Cart 
-                    <?php if ($cart_count > 0): ?>
-                        <span class="badge bg-light text-dark"><?= $cart_count ?></span>
-                    <?php endif; ?>
-                </a>
-            <?php else: ?>
-                <a href="../auth/login.php" class="btn btn-primary">
-                    <i class="fas fa-sign-in-alt"></i> Login to Purchase
-                </a>
-            <?php endif; ?>
-        </div>
-    </div>
-
-    <!-- Alerts -->
-    <?php if (isset($success)): ?>
-        <div class="alert alert-success alert-dismissible fade show">
-            <i class="fas fa-check-circle"></i> <?= htmlspecialchars($success) ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    <?php endif; ?>
-
-    <?php if (isset($error)): ?>
-        <div class="alert alert-danger alert-dismissible fade show">
-            <i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($error) ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    <?php endif; ?>
-
-    <?php if ($access_denied): ?>
-        <div class="alert alert-warning alert-dismissible fade show">
-            <i class="fas fa-lock"></i> <strong>Access Denied!</strong> You need to purchase this subject to access question papers and attend exams.
-            <?php if ($subject_id_for_access): ?>
-                <br><small>Please purchase the subject below to gain access.</small>
-            <?php endif; ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    <?php endif; ?>
-
-    <!-- Filters -->
-    <div class="card mb-4">
-        <div class="card-header">
-            <h6 class="mb-0"><i class="fas fa-filter"></i> Filter Subjects</h6>
-        </div>
-        <div class="card-body">
-            <form method="GET" class="row g-3">
-                <div class="col-md-3">
-                    <label class="form-label">Department</label>
-                    <select name="department" class="form-select">
-                        <option value="">All Departments</option>
-                        <?php while ($dept = $departments->fetch_assoc()): ?>
-                            <option value="<?= htmlspecialchars($dept['department']) ?>" 
-                                    <?= $department_filter === $dept['department'] ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($dept['department']) ?>
-                            </option>
-                        <?php endwhile; ?>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label">Year</label>
-                    <select name="year" class="form-select">
-                        <option value="">All Years</option>
-                        <option value="1" <?= $year_filter === '1' ? 'selected' : '' ?>>1st Year</option>
-                        <option value="2" <?= $year_filter === '2' ? 'selected' : '' ?>>2nd Year</option>
-                        <option value="3" <?= $year_filter === '3' ? 'selected' : '' ?>>3rd Year</option>
-                        <option value="4" <?= $year_filter === '4' ? 'selected' : '' ?>>4th Year</option>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label">Min Price</label>
-                    <input type="number" name="price_min" class="form-control" step="0.01" 
-                           value="<?= htmlspecialchars($price_min) ?>" placeholder="0.00">
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label">Max Price</label>
-                    <input type="number" name="price_max" class="form-control" step="0.01" 
-                           value="<?= htmlspecialchars($price_max) ?>" placeholder="200.00">
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Search</label>
-                    <div class="input-group">
-                        <input type="text" name="search" class="form-control" 
-                               value="<?= htmlspecialchars($search) ?>" placeholder="Search subjects...">
-                        <button type="submit" class="btn btn-outline-primary">
-                            <i class="fas fa-search"></i>
-                        </button>
-                    </div>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Subjects Grid -->
-    <div class="row">
-        <?php if ($subjects->num_rows > 0): ?>
-            <?php while ($subject = $subjects->fetch_assoc()): ?>
-                <div class="col-lg-4 col-md-6 mb-4">
-                    <div class="card h-100 shadow-sm" data-subject-id="<?= $subject['id'] ?>">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0 text-primary"><?= htmlspecialchars($subject['code']) ?></h6>
-                            <span class="badge bg-secondary"><?= htmlspecialchars($subject['department']) ?></span>
-                        </div>
-                        <div class="card-body d-flex flex-column">
-                            <h5 class="card-title"><?= htmlspecialchars($subject['name']) ?></h5>
-                            <p class="card-text text-muted flex-grow-1">
-                                <?= htmlspecialchars($subject['description'] ?: 'No description available.') ?>
-                            </p>
-                            
-                            <div class="mt-auto">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <div>
-                                        <?php if ($subject['year']): ?>
-                                            <small class="text-muted">Year <?= $subject['year'] ?></small><br>
-                                        <?php endif; ?>
-                                        <?php if ($subject['semester']): ?>
-                                            <small class="text-muted">Semester <?= $subject['semester'] ?></small>
-                                        <?php endif; ?>
-                                    </div>
-                                    <div class="text-end">
-                                        <div class="h5 text-primary mb-0">$<?= number_format($subject['price'], 2) ?></div>
-                                        <small class="text-muted"><?= $subject['duration_days'] ?> days access</small>
-                                    </div>
-                                </div>
-
-                                <?php if (!$is_logged_in): ?>
-                                    <a href="../auth/login.php" class="btn btn-primary w-100">
-                                        <i class="fas fa-sign-in-alt"></i> Login to Purchase
-                                    </a>
-                                <?php elseif ($subject['is_purchased']): ?>
-                                    <button class="btn btn-success w-100" disabled>
-                                        <i class="fas fa-check"></i> Already Purchased
-                                    </button>
-                                <?php elseif ($subject['in_cart']): ?>
-                                    <div class="d-flex gap-2">
-                                        <button class="btn btn-secondary flex-grow-1" disabled>
-                                            <i class="fas fa-shopping-cart"></i> In Cart
-                                        </button>
-                                        <a href="cart.php" class="btn btn-primary">
-                                            <i class="fas fa-arrow-right"></i>
-                                        </a>
-                                    </div>
-                                <?php else: ?>
-                                    <form method="POST" class="d-inline w-100">
-                                        <input type="hidden" name="subject_id" value="<?= $subject['id'] ?>">
-                                        <button type="submit" name="add_to_cart" class="btn btn-primary w-100">
-                                            <i class="fas fa-cart-plus"></i> Add to Cart
-                                        </button>
-                                    </form>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            <?php endwhile; ?>
-        <?php else: ?>
-            <div class="col-12">
-                <div class="text-center py-5">
-                    <i class="fas fa-books fa-3x text-muted mb-3"></i>
-                    <h4 class="text-muted">No subjects found</h4>
-                    <p class="text-muted">Try adjusting your filters or search criteria.</p>
-                </div>
-            </div>
-        <?php endif; ?>
-    </div>
-</div>
+<link rel="stylesheet" href="../moderator/css/moderator-style.css">
 
 <style>
-.card:hover {
-    transform: translateY(-2px);
-    transition: transform 0.2s ease-in-out;
+/* Additional styles for browse exams */
+.browse-exams-content {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: #ffffff;
+    color: var(--text-dark);
+    line-height: 1.6;
 }
 
-.badge {
-    font-size: 0.75em;
+.subject-card {
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    height: 100%;
+    transition: all 0.2s;
+}
+
+.subject-card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.subject-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 1rem;
+}
+
+.subject-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 0.75rem;
+}
+
+.subject-description {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+    line-height: 1.5;
+    flex-grow: 1;
+}
+
+.subject-footer {
+    margin-top: auto;
+}
+
+.subject-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.subject-price {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.subjects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+}
+
+.empty-subjects {
+    text-align: center;
+    padding: 3rem 1rem;
+}
+
+.empty-subjects i {
+    font-size: 3rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
 }
 
 .highlight-subject {
-    border: 2px solid #ffc107 !important;
+    border: 2px solid var(--warning-color) !important;
     animation: highlight-pulse 2s ease-in-out 3;
 }
 
 @keyframes highlight-pulse {
-    0%, 100% { box-shadow: 0 0 10px rgba(255, 193, 7, 0.5); }
-    50% { box-shadow: 0 0 20px rgba(255, 193, 7, 0.8); }
+    0%, 100% { box-shadow: 0 0 10px rgba(245, 158, 11, 0.5); }
+    50% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.8); }
+}
+
+@media (max-width: 768px) {
+    .subjects-grid {
+        grid-template-columns: 1fr;
+    }
 }
 </style>
+
+<div class="browse-exams-content">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1><i class="fas fa-book-open"></i> Browse Available Exams</h1>
+                    <p>Explore our comprehensive collection of exam subjects and add them to your cart</p>
+                </div>
+                <div>
+                    <?php if ($is_logged_in): ?>
+                        <a href="cart.php" class="btn btn-primary">
+                            <i class="fas fa-shopping-cart"></i> Cart 
+                            <?php if ($cart_count > 0): ?>
+                                <span class="badge bg-secondary" style="background: white !important; color: var(--primary-color) !important; margin-left: 0.25rem;"><?= $cart_count ?></span>
+                            <?php endif; ?>
+                        </a>
+                    <?php else: ?>
+                        <a href="../auth/login.php" class="btn btn-primary">
+                            <i class="fas fa-sign-in-alt"></i> Login to Purchase
+                        </a>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+
+        <!-- Alerts -->
+        <?php if (isset($success)): ?>
+            <div class="alert alert-success alert-dismissible fade show">
+                <i class="fas fa-check-circle"></i> <?= htmlspecialchars($success) ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        <?php endif; ?>
+
+        <?php if (isset($error)): ?>
+            <div class="alert alert-danger alert-dismissible fade show">
+                <i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($error) ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        <?php endif; ?>
+
+        <?php if ($access_denied): ?>
+            <div class="alert alert-warning alert-dismissible fade show">
+                <i class="fas fa-lock"></i> <strong>Access Denied!</strong> You need to purchase this subject to access question papers and attend exams.
+                <?php if ($subject_id_for_access): ?>
+                    <br><small>Please purchase the subject below to gain access.</small>
+                <?php endif; ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        <?php endif; ?>
+
+        <!-- Filters -->
+        <div class="dashboard-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0"><i class="fas fa-filter"></i> Filter Subjects</h5>
+            </div>
+            <form method="GET" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Grade Level</label>
+                    <select name="grade" class="form-select">
+                        <option value="">All Grades</option>
+                        <option value="10th" <?= $grade_filter === '10th' ? 'selected' : '' ?>>10th Standard</option>
+                        <option value="12th" <?= $grade_filter === '12th' ? 'selected' : '' ?>>12th Standard</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Search Subject</label>
+                    <input type="text" name="search" class="form-control" 
+                           value="<?= htmlspecialchars($search) ?>" 
+                           placeholder="Search by subject name or code...">
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter"></i> Filter
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Subjects Grid -->
+        <div class="dashboard-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0"><i class="fas fa-book-open"></i> Available Subjects</h5>
+            </div>
+            
+            <?php if ($subjects->num_rows > 0): ?>
+                <div class="subjects-grid">
+                    <?php while ($subject = $subjects->fetch_assoc()): ?>
+                        <div class="subject-card" data-subject-id="<?= $subject['id'] ?>">
+                            <div class="d-flex flex-column h-100">
+                                <h6 class="subject-title"><?= htmlspecialchars($subject['name']) ?></h6>
+                                
+                                <?php if ($subject['description']): ?>
+                                    <p class="subject-description">
+                                        <?= htmlspecialchars($subject['description']) ?>
+                                    </p>
+                                <?php endif; ?>
+                                
+                                <div class="subject-footer">
+                                    <div class="subject-info">
+                                        <div>
+                                            <?php if ($subject['grade_level']): ?>
+                                                <span class="badge bg-primary" style="background: var(--primary-color) !important; color: white !important;">
+                                                    <?= htmlspecialchars($subject['grade_level']) ?> Standard
+                                                </span>
+                                            <?php endif; ?>
+                                            <?php if ($subject['semester']): ?>
+                                                <small class="text-muted d-block mt-1">Semester <?= $subject['semester'] ?></small>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="subject-price">₹<?= number_format($subject['price'], 2) ?></div>
+                                    </div>
+
+                                    <?php if (!$is_logged_in): ?>
+                                        <a href="../auth/login.php" class="btn btn-primary w-100">
+                                            <i class="fas fa-sign-in-alt"></i> Login to Purchase
+                                        </a>
+                                    <?php elseif ($subject['is_purchased']): ?>
+                                        <button class="btn btn-outline-success w-100" disabled>
+                                            <i class="fas fa-check"></i> Already Purchased
+                                        </button>
+                                    <?php elseif ($subject['in_cart']): ?>
+                                        <div class="d-flex gap-2">
+                                            <button class="btn btn-outline-secondary flex-grow-1" disabled>
+                                                <i class="fas fa-shopping-cart"></i> In Cart
+                                            </button>
+                                            <a href="cart.php" class="btn btn-primary">
+                                                <i class="fas fa-arrow-right"></i>
+                                            </a>
+                                        </div>
+                                    <?php else: ?>
+                                        <form method="POST" class="d-inline w-100">
+                                            <input type="hidden" name="subject_id" value="<?= $subject['id'] ?>">
+                                            <button type="submit" name="add_to_cart" class="btn btn-primary w-100">
+                                                <i class="fas fa-cart-plus"></i> Add to Cart
+                                            </button>
+                                        </form>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endwhile; ?>
+                </div>
+            <?php else: ?>
+                <div class="empty-subjects">
+                    <i class="fas fa-book-open"></i>
+                    <h5>No subjects found</h5>
+                    <p class="text-muted">Try adjusting your filters or search criteria.</p>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {

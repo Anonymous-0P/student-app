@@ -40,13 +40,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_paper'])) {
             $file_path = $upload_dir . $unique_filename;
             
             if (move_uploaded_file($file['tmp_name'], $file_path)) {
+                // Update subject name with paper title if provided
+                if (!empty($title) && $subject_id > 0) {
+                    $update_subject = $conn->prepare("UPDATE subjects SET name = ? WHERE id = ?");
+                    $update_subject->bind_param("si", $title, $subject_id);
+                    $update_subject->execute();
+                }
+                
                 // Insert into database
                 $stmt = $conn->prepare("INSERT INTO question_papers (subject_id, title, description, file_path, original_filename, file_size, mime_type, grade_level, exam_type, marks, duration_minutes, instructions, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 $stmt->bind_param("isssssissiisi", $subject_id, $title, $description, $file_path, $original_filename, $file_size, $mime_type, $grade_level, $exam_type, $marks, $duration, $instructions, $_SESSION['user_id']);
                 
                 if ($stmt->execute()) {
                     $success = true;
-                    $_SESSION['message'] = 'Question paper uploaded successfully!';
+                    $_SESSION['message'] = 'Question paper uploaded successfully and subject name updated!';
                 } else {
                     $error = 'Database error occurred.';
                     unlink($file_path); // Remove uploaded file if DB insert fails
@@ -210,95 +217,77 @@ if ($papers_result) {
 include('../includes/header.php');
 ?>
 
+<link rel="stylesheet" href="../moderator/css/moderator-style.css">
+
 <style>
-.admin-card {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    transition: all 0.3s ease;
-    border: none;
-    position: relative;
-    overflow: hidden;
-}
-
-.admin-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 4px;
-    height: 100%;
-    background: linear-gradient(135deg, #667eea, #764ba2);
-}
-
 .upload-area {
-    border: 2px dashed #667eea;
-    border-radius: 12px;
-    padding: 2rem;
+    border: 2px dashed var(--border-color);
+    border-radius: 8px;
+    padding: 2.5rem 2rem;
     text-align: center;
-    background: #f8f9ff;
-    transition: all 0.3s ease;
+    background: var(--bg-light);
+    transition: all 0.2s ease;
     cursor: pointer;
 }
 
 .upload-area:hover {
-    border-color: #764ba2;
-    background: #f0f2ff;
+    border-color: var(--primary-color);
+    background: white;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
 }
 
 .upload-area.dragover {
-    border-color: #764ba2;
-    background: #e8ebff;
-    transform: scale(1.02);
+    border-color: var(--primary-color);
+    background: white;
+    border-style: solid;
 }
 
 .file-icon {
-    font-size: 3rem;
-    color: #667eea;
-    margin-bottom: 1rem;
+    font-size: 2.5rem;
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+    opacity: 0.8;
 }
 
-.btn-gradient {
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    border: none;
-    color: white;
-    padding: 0.75rem 1.5rem;
-    border-radius: 8px;
-    transition: all 0.3s ease;
+.upload-area h6 {
+    color: var(--text-dark);
+    font-weight: 500;
+    font-size: 1rem;
 }
 
-.btn-gradient:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
-    color: white;
+#fileInfo {
+    padding: 0.75rem;
+    background: var(--bg-light);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.875rem;
 }
 
 .paper-card {
     background: white;
-    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
     padding: 1.5rem;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    transition: all 0.3s ease;
-    border-left: 4px solid transparent;
+    transition: all 0.2s ease;
+    height: 100%;
 }
 
 .paper-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .paper-card.active {
-    border-left-color: #28a745;
+    border-left: 3px solid var(--success-color);
 }
 
 .paper-card.inactive {
-    border-left-color: #dc3545;
+    border-left: 3px solid var(--danger-color);
     opacity: 0.7;
 }
 
 .grade-badge {
-    background: linear-gradient(135deg, #667eea, #764ba2);
+    background: var(--primary-color);
     color: white;
     padding: 0.25rem 0.75rem;
     border-radius: 20px;
@@ -307,35 +296,32 @@ include('../includes/header.php');
 }
 
 .exam-type-badge {
-    background: #f8f9fa;
-    color: #495057;
+    background: var(--bg-light);
+    color: var(--text-dark);
     padding: 0.25rem 0.5rem;
     border-radius: 15px;
     font-size: 0.75rem;
-    border: 1px solid #e9ecef;
-}
-
-.stats-widget {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 15px;
-    padding: 1.5rem;
-    color: white;
-    text-align: center;
+    border: 1px solid var(--border-color);
 }
 
 .fade-in {
-    animation: fadeIn 0.6s ease-out;
+    animation: fadeIn 0.4s ease-out;
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
+    from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
+}
+
+/* Ensure all badges have white text */
+.badge {
+    color: white !important;
 }
 </style>
 
-<div class="container-fluid">
+<div class="container-fluid" style="padding-left: 50px; padding-right: 50px;">
     <!-- Header -->
-    <div class="row mb-4 fade-in">
+    <div class="row mb-4 mt-4 fade-in">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
@@ -376,7 +362,6 @@ include('../includes/header.php');
             COUNT(*) as total_papers,
             COUNT(CASE WHEN is_active = 1 THEN 1 END) as active_papers,
             COUNT(CASE WHEN grade_level = '10th' THEN 1 END) as grade_10_papers,
-            COUNT(CASE WHEN grade_level = '11th' THEN 1 END) as grade_11_papers,
             COUNT(CASE WHEN grade_level = '12th' THEN 1 END) as grade_12_papers
             FROM question_papers");
         
@@ -391,35 +376,54 @@ include('../includes/header.php');
                 'total_papers' => 0,
                 'active_papers' => 0,
                 'grade_10_papers' => 0,
-                'grade_11_papers' => 0,
                 'grade_12_papers' => 0,
                 'total_downloads' => 0
             ];
         }
         ?>
-        <div class="col-md-2 fade-in" style="animation-delay: 0.1s;">
-            <div class="stats-widget">
-                <div class="h4 mb-1"><?= $stats['total_papers'] ?></div>
-                <div class="small opacity-75">Total Papers</div>
+        <div class="col-md-3 fade-in" style="animation-delay: 0.1s;">
+            <div class="stat-box">
+                <div class="stat-icon">
+                    <i class="fas fa-file-alt"></i>
+                </div>
+                <div class="stat-details">
+                    <div class="stat-value"><?= $stats['total_papers'] ?></div>
+                    <div class="stat-label">Total Papers</div>
+                </div>
             </div>
         </div>
-        <div class="col-md-2 fade-in" style="animation-delay: 0.2s;">
-            <div class="stats-widget">
-                <div class="h4 mb-1"><?= $stats['active_papers'] ?></div>
-                <div class="small opacity-75">Active Papers</div>
+        <div class="col-md-3 fade-in" style="animation-delay: 0.2s;">
+            <div class="stat-box">
+                <div class="stat-icon" style="background-color: rgba(16, 185, 129, 0.1); color: #10b981;">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="stat-details">
+                    <div class="stat-value"><?= $stats['active_papers'] ?></div>
+                    <div class="stat-label">Active Papers</div>
+                </div>
             </div>
         </div>
-        <div class="col-md-2 fade-in" style="animation-delay: 0.3s;">
-            <div class="stats-widget">
-                <div class="h4 mb-1"><?= $stats['grade_10_papers'] ?></div>
-                <div class="small opacity-75">Grade 10th</div>
+        <div class="col-md-3 fade-in" style="animation-delay: 0.3s;">
+            <div class="stat-box">
+                <div class="stat-icon" style="background-color: rgba(239, 68, 68, 0.1); color: #ef4444;">
+                    <i class="fas fa-graduation-cap"></i>
+                </div>
+                <div class="stat-details">
+                    <div class="stat-value"><?= $stats['grade_10_papers'] ?></div>
+                    <div class="stat-label">Grade 10th</div>
+                </div>
             </div>
         </div>
         
-        <div class="col-md-2 fade-in" style="animation-delay: 0.5s;">
-            <div class="stats-widget">
-                <div class="h4 mb-1"><?= $stats['grade_12_papers'] ?></div>
-                <div class="small opacity-75">Grade 12th</div>
+        <div class="col-md-3 fade-in" style="animation-delay: 0.4s;">
+            <div class="stat-box">
+                <div class="stat-icon" style="background-color: rgba(245, 158, 11, 0.1); color: #f59e0b;">
+                    <i class="fas fa-user-graduate"></i>
+                </div>
+                <div class="stat-details">
+                    <div class="stat-value"><?= $stats['grade_12_papers'] ?></div>
+                    <div class="stat-label">Grade 12th</div>
+                </div>
             </div>
         </div>
         
@@ -428,19 +432,22 @@ include('../includes/header.php');
     <!-- Upload Form -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="admin-card fade-in" style="animation-delay: 0.7s;">
-                <h5 class="mb-3"><i class="fas fa-upload text-primary"></i> Upload New Question Paper</h5>
+            <div class="dashboard-card fade-in" style="animation-delay: 0.5s;">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="mb-0"><i class="fas fa-upload text-primary"></i> Upload New Question Paper</h5>
+                </div>
                 
                 <form method="POST" enctype="multipart/form-data" id="uploadForm">
                     <div class="row g-3">
                         <!-- File Upload Area -->
                         <div class="col-12">
+                            <label class="form-label">Question Paper File *</label>
                             <div class="upload-area" onclick="document.getElementById('fileInput').click()">
                                 <div class="file-icon">
                                     <i class="fas fa-cloud-upload-alt"></i>
                                 </div>
-                                <h6>Click to upload or drag and drop</h6>
-                                <p class="text-muted mb-0">PDF, DOC, or DOCX files only (Max 10MB)</p>
+                                <h6 class="mb-2">Click to upload or drag and drop</h6>
+                                <p class="text-muted mb-0 small">PDF, DOC, or DOCX files only (Max 10MB)</p>
                                 <input type="file" id="fileInput" name="question_paper" accept=".pdf,.doc,.docx" style="display: none;" required>
                             </div>
                             <div id="fileInfo" class="mt-2" style="display: none;"></div>
@@ -464,7 +471,6 @@ include('../includes/header.php');
                             <select class="form-select" id="grade_level" name="grade_level" required>
                                 <option value="">Select Grade</option>
                                 <option value="10th">10th Grade</option>
-                                <option value="11th">11th Grade</option>
                                 <option value="12th">12th Grade</option>
                             </select>
                         </div>
@@ -492,9 +498,14 @@ include('../includes/header.php');
                         </div>
 
                         <div class="col-12">
-                            <button type="submit" name="upload_paper" class="btn-gradient">
-                                <i class="fas fa-upload"></i> Upload Question Paper
-                            </button>
+                            <div class="d-flex gap-2">
+                                <button type="submit" name="upload_paper" class="btn btn-primary">
+                                    <i class="fas fa-upload"></i> Upload Question Paper
+                                </button>
+                                <button type="reset" class="btn btn-outline-secondary">
+                                    <i class="fas fa-redo"></i> Reset Form
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </form>
@@ -508,7 +519,7 @@ include('../includes/header.php');
     <!-- Question Papers List -->
     <div class="row">
         <div class="col-12">
-            <div class="admin-card">
+            <div class="dashboard-card">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="mb-0"><i class="fas fa-list text-info"></i> Question Papers (<?= $total_papers ?> total)</h5>
                 </div>

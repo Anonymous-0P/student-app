@@ -281,7 +281,7 @@ header('Expires: 0');
                     </small>
                 </div>
                 <div class="col-auto">
-                    <a href="question_papers.php" class="btn btn-light btn-sm">
+                    <a href="dashboard.php" class="btn btn-light btn-sm">
                         <i class="fas fa-arrow-left me-1"></i> Back to Papers
                     </a>
                 </div>

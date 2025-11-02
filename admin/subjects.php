@@ -245,11 +245,20 @@ $subjectStats = $stats_query ? $stats_query->fetch_assoc() : array(
 include('../includes/header.php');
 ?>
 
-<div class="container-fluid">
+<link rel="stylesheet" href="../moderator/css/moderator-style.css">
+
+<style>
+/* Ensure all badges have white text */
+.badge {
+    color: white !important;
+}
+</style>
+
+<div class="container-fluid" style="padding-left: 50px; padding-right: 50px;">
     <div class="row">
         <div class="col-12">
             <!-- Header Section -->
-            <div class="d-flex justify-content-between align-items-center mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-4 mt-4">
                 <div>
                     <h1 class="h3 mb-1"><i class="fas fa-book text-primary"></i> Subject Management</h1>
                     <p class="text-muted mb-0">Manage academic subjects and courses</p>
@@ -347,8 +356,8 @@ include('../includes/header.php');
             <?php endif; ?>
 
             <!-- Search and Filter Section -->
-            <div class="card border-0 shadow-sm mb-4">
-                <div class="card-body">
+            <div class="dashboard-card mb-4">
+                <div>
                     <form method="GET" action="">
                         <div class="row g-3">
                             <div class="col-md-4">
@@ -370,7 +379,6 @@ include('../includes/header.php');
                                 <select class="form-select" id="grade_filter" name="grade">
                                     <option value="">All Grades</option>
                                     <option value="10th" <?= $grade_filter === '10th' ? 'selected' : '' ?>>10th Grade</option>
-                                    <option value="11th" <?= $grade_filter === '11th' ? 'selected' : '' ?>>11th Grade</option>
                                     <option value="12th" <?= $grade_filter === '12th' ? 'selected' : '' ?>>12th Grade</option>
                                 </select>
                             </div>
@@ -388,8 +396,8 @@ include('../includes/header.php');
             </div>
 
             <!-- Subjects Table -->
-            <div class="card border-0 shadow-sm">
-                <div class="card-body">
+            <div class="dashboard-card">
+                <div>
                     <?php if($subjects && $subjects->num_rows > 0): ?>
                         <div class="table-responsive">
                             <table class="table table-hover">
@@ -424,7 +432,11 @@ include('../includes/header.php');
                                         </td>
                                         <td>
                                             <div class="fw-semibold text-success">
-                                                $<?= number_format($subject['price'] ?? 0, 2) ?>
+                                                                        <td>
+                            <div class="fw-semibold text-success">
+                                ₹<?= number_format($subject['price'] ?? 0, 2) ?>
+                            </div>
+                        </td>
                                             </div>
                                         </td>
                                         <td>
@@ -437,7 +449,7 @@ include('../includes/header.php');
                                             </div>
                                         </td>
                                         <td>
-                                            <span class="badge bg-warning text-dark"><?= $subject['questions_count'] ?> Questions</span>
+                                            <span class="badge bg-warning"><?= $subject['questions_count'] ?> Questions</span>
                                         </td>
                                         <td>
                                             <?php if($subject['is_active']): ?>
@@ -521,7 +533,6 @@ include('../includes/header.php');
                             <select class="form-select" name="grade" id="grade" required>
                                 <option value="">Select Grade Level</option>
                                 <option value="10th">10th Grade</option>
-                                <option value="11th">11th Grade</option>
                                 <option value="12th">12th Grade</option>
                             </select>
                         </div>
@@ -531,7 +542,7 @@ include('../includes/header.php');
                                       placeholder="Brief description of the subject content and objectives"></textarea>
                         </div>
                         <div class="col-md-6">
-                            <label for="price" class="form-label">Price ($) *</label>
+                            <label for="price" class="form-label">Price (₹) *</label>
                             <input type="number" step="0.01" min="0" class="form-control" name="price" id="price" 
                                    value="100.00" required placeholder="99.99">
                             <div class="form-text">Price for students to purchase this subject</div>

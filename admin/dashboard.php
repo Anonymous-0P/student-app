@@ -17,31 +17,33 @@ checkLogin('admin');
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Moderator Style CSS -->
+    <link rel="stylesheet" href="../moderator/css/moderator-style.css">
 </head>
-<body class="bg-light">
+<body style="background: #f9fafb;">
 
-<!-- Professional Integrated Navbar -->
-<nav class="navbar navbar-expand-lg navbar-dark shadow-lg" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+<!-- Modern Clean Navbar -->
+<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm" style="border-bottom: 1px solid #e5e7eb;">
     <div class="container-fluid">
-        <!-- Hamburger Menu Button - Integrated into Navbar -->
-        <button class="navbar-toggler border-0 me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#adminMenuOffcanvas" aria-controls="adminMenuOffcanvas" style="order: -1;">
+        <!-- Hamburger Menu Button -->
+        <button class="navbar-toggler border-0 me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#adminMenuOffcanvas" aria-controls="adminMenuOffcanvas">
             <span class="navbar-toggler-icon"></span>
         </button>
         
         <!-- Brand -->
-        <a class="navbar-brand d-flex align-items-center" href="../index.php">
+        <a class="navbar-brand d-flex align-items-center" href="../index.php" style="color: var(--primary-color); font-weight: 600;">
             <i class="fas fa-graduation-cap me-2 fs-4"></i>
-            <span class="fw-bold">ThetaExams</span>
+            <span>ThetaExams</span>
         </a>
         
         <!-- User Info & Logout -->
         <div class="d-flex align-items-center">
             <div class="dropdown">
-                <button class="btn btn-outline-light dropdown-toggle border-0" type="button" data-bs-toggle="dropdown">
+                <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" style="border-radius: 6px;">
                     <i class="fas fa-user-circle me-1"></i>
                     <span class="d-none d-sm-inline"><?= htmlspecialchars($_SESSION['name'] ?? 'Admin') ?></span>
                 </button>
-                <ul class="dropdown-menu dropdown-menu-end">
+                <ul class="dropdown-menu dropdown-menu-end" style="border-radius: 8px; border: 1px solid #e5e7eb; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
                     <li><a class="dropdown-item text-danger" href="../auth/logout.php"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
                 </ul>
             </div>
@@ -49,22 +51,22 @@ checkLogin('admin');
     </div>
 </nav>
 
-<!-- Professional Offcanvas Menu -->
-<div class="offcanvas offcanvas-start" tabindex="-1" id="adminMenuOffcanvas" aria-labelledby="adminMenuOffcanvasLabel" style="width: 320px;">
-    <div class="offcanvas-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
-        <h5 class="offcanvas-title fw-bold" id="adminMenuOffcanvasLabel">
-            <i class="fas fa-user-shield me-2"></i>Admin Dashboard
+<!-- Clean Offcanvas Menu -->
+<div class="offcanvas offcanvas-start" tabindex="-1" id="adminMenuOffcanvas" aria-labelledby="adminMenuOffcanvasLabel" style="width: 280px; border-right: 1px solid #e5e7eb;">
+    <div class="offcanvas-header" style="background: white; border-bottom: 1px solid #e5e7eb;">
+        <h5 class="offcanvas-title" id="adminMenuOffcanvasLabel" style="color: var(--text-dark); font-weight: 600; font-size: 1.125rem;">
+            <i class="fas fa-user-shield me-2" style="color: var(--primary-color);"></i>Admin Panel
         </h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
     </div>
-    <div class="offcanvas-body p-0" style="background: linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%);">
-        <!-- Quick Stats Overview -->
-        <div class="p-3 border-bottom bg-light">
+    <div class="offcanvas-body p-0" style="background: white;">
+        <!-- User Info -->
+        <div class="p-3 border-bottom" style="background: var(--bg-light);">
             <div class="d-flex justify-content-between align-items-center">
-                <small class="text-muted fw-semibold">Welcome back!</small>
-                <span class="badge bg-success">Online</span>
+                <small class="text-muted" style="font-weight: 500;">Welcome back!</small>
+                <span class="badge bg-success" style="background: #10b981 !important; color: white !important;">Online</span>
             </div>
-            <h6 class="mb-0 text-dark fw-bold"><?= htmlspecialchars($_SESSION['name'] ?? 'Admin') ?></h6>
+            <h6 class="mb-0" style="color: var(--text-dark); font-weight: 600;"><?= htmlspecialchars($_SESSION['name'] ?? 'Admin') ?></h6>
         </div>
         
         <div class="nav-section">
@@ -191,233 +193,105 @@ checkLogin('admin');
 </div>
 
 <style>
-/* Professional Offcanvas Navigation Styles */
-.offcanvas {
-    box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
-    border: none;
-    background: #ffffff;
+/* Additional admin-specific styles extending moderator-style.css */
+.admin-content {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: #f9fafb;
+    color: var(--text-dark);
+    line-height: 1.6;
 }
 
-.offcanvas-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-bottom: none;
-    padding: 1.5rem;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-}
-
-.offcanvas-title {
-    font-weight: 700;
-    font-size: 1.25rem;
-}
-
-.offcanvas-body {
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-}
-
-.nav-section {
+/* Offcanvas Menu Styles */
+.offcanvas-body .nav-section {
     margin-bottom: 0.5rem;
     padding: 0 1rem;
 }
 
-.nav-section:first-of-type {
+.offcanvas-body .nav-section:first-of-type {
     margin-top: 1rem;
 }
 
-.nav-section-title {
+.offcanvas-body .nav-section-title {
     font-size: 0.75rem;
-    font-weight: 700;
-    color: #6c757d;
+    font-weight: 600;
+    color: var(--text-muted);
     margin-bottom: 0.75rem;
     padding: 0.5rem 0;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    border-bottom: 1px solid #e9ecef;
-    background: transparent;
-    border-radius: 0;
-    border-left: none;
+    border-bottom: 1px solid var(--border-color);
 }
 
-.nav-link {
-    color: #495057 !important;
-    padding: 0.875rem 1rem;
-    border-radius: 12px;
+.offcanvas-body .nav-link {
+    color: var(--text-dark) !important;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
     margin: 0.125rem 0;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.2s ease;
     text-decoration: none;
     font-weight: 500;
-    font-size: 0.9rem;
-    position: relative;
+    font-size: 0.875rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border: 1px solid transparent;
 }
 
-.nav-link:hover {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+.offcanvas-body .nav-link:hover {
+    background: var(--primary-color);
     color: white !important;
-    transform: translateX(8px) scale(1.02);
-    border-color: rgba(102, 126, 234, 0.2);
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
+    transform: translateX(4px);
 }
 
-.nav-link.active {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+.offcanvas-body .nav-link.active {
+    background: var(--primary-color);
     color: white !important;
     font-weight: 600;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-    transform: translateX(5px);
 }
 
-.nav-link i {
+.offcanvas-body .nav-link i {
     width: 20px;
     text-align: center;
-    font-size: 1rem;
+    font-size: 0.875rem;
 }
 
-.nav-arrow {
+.offcanvas-body .nav-arrow {
     opacity: 0.5;
     font-size: 0.75rem;
-    transition: all 0.3s ease;
 }
 
-.nav-link:hover .nav-arrow {
+.offcanvas-body .nav-link:hover .nav-arrow {
     opacity: 1;
-    transform: translateX(3px);
+    transform: translateX(2px);
 }
 
-/* Professional Navbar Styles */
+/* Navbar Styles */
 .navbar {
-    box-shadow: 0 2px 20px rgba(102, 126, 234, 0.15);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
-    padding: 1rem 0;
+    padding: 0.75rem 0;
 }
 
 .navbar-brand {
-    font-weight: 700;
-    font-size: 1.4rem;
-    color: white !important;
-    text-decoration: none;
-    transition: all 0.3s ease;
-}
-
-.navbar-brand:hover {
-    transform: scale(1.05);
-    color: rgba(255, 255, 255, 0.9) !important;
-}
-
-.navbar-toggler {
-    padding: 0.5rem;
-    border: 2px solid rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.1);
-    transition: all 0.3s ease;
-}
-
-.navbar-toggler:hover {
-    background: rgba(255, 255, 255, 0.2);
-    border-color: rgba(255, 255, 255, 0.4);
-    transform: scale(1.05);
+    font-size: 1.25rem;
+    font-weight: 600;
 }
 
 .navbar-toggler:focus {
-    box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.25);
-}
-
-.dropdown-toggle {
-    background: rgba(255, 255, 255, 0.1) !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    padding: 0.5rem 1rem !important;
-    border-radius: 8px !important;
-    transition: all 0.3s ease;
-}
-
-.dropdown-toggle:hover {
-    background: rgba(255, 255, 255, 0.2) !important;
-    border-color: rgba(255, 255, 255, 0.4) !important;
-    transform: translateY(-2px);
-}
-
-.dropdown-menu {
-    border: none;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-    border-radius: 12px;
-    padding: 0.5rem 0;
-    margin-top: 0.5rem;
+    box-shadow: 0 0 0 0.2rem rgba(37, 99, 235, 0.25);
 }
 
 .dropdown-item {
-    padding: 0.75rem 1.5rem;
-    font-weight: 500;
-    transition: all 0.3s ease;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    transition: all 0.15s ease;
 }
 
 .dropdown-item:hover {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    transform: translateX(5px);
+    background: var(--bg-light);
 }
 
-/* Badge Styles */
-.badge {
-    font-weight: 600;
-    padding: 0.5rem 0.75rem;
-    border-radius: 6px;
-    font-size: 0.8rem;
+/* Footer in Offcanvas */
+.offcanvas-body .mt-auto {
+    margin-top: auto !important;
 }
-
-.bg-light {
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.1)) !important;
-    color: #667eea !important;
-    border: 1px solid rgba(102, 126, 234, 0.2);
-}
-
-/* Mobile Responsive */
-@media (max-width: 768px) {
-    .navbar-brand {
-        font-size: 1.2rem;
-    }
-    
-    .offcanvas {
-        width: 280px !important;
-    }
-    
-    .nav-section-title {
-        font-size: 0.7rem;
-    }
-    
-    .nav-link {
-        font-size: 0.85rem;
-        padding: 0.75rem;
-    }
-}
-
-/* Animation enhancements */
-@keyframes slideInLeft {
-    from {
-        opacity: 0;
-        transform: translateX(-30px);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
-}
-
-.nav-section {
-    animation: slideInLeft 0.6s ease-out;
-}
-
-.nav-section:nth-child(2) { animation-delay: 0.1s; }
-.nav-section:nth-child(3) { animation-delay: 0.2s; }
-.nav-section:nth-child(4) { animation-delay: 0.3s; }
-.nav-section:nth-child(5) { animation-delay: 0.4s; }
-.nav-section:nth-child(6) { animation-delay: 0.5s; }
 </style>
 
 <?php
@@ -527,147 +401,68 @@ if ($ratingsTableExists) {
 ?>
 
 <style>
-.admin-card {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    transition: all 0.3s ease;
-    border: none;
-    position: relative;
-    overflow: hidden;
-}
-
-.admin-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 4px;
-    height: 100%;
-    background: linear-gradient(135deg, #667eea, #764ba2);
-}
-
-.admin-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-}
-
-.stat-card {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 15px;
-    padding: 2rem;
-    color: white;
-    position: relative;
-    overflow: hidden;
-}
-
-.stat-card::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 100px;
-    height: 100px;
-    background: rgba(255,255,255,0.1);
-    border-radius: 50%;
-    transform: translate(30%, -30%);
-}
-
+/* Action Cards - Modernstyle matching moderator panel */
 .action-card {
     background: white;
-    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
     padding: 1.5rem;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    transition: all 0.3s ease;
-    border: none;
+    transition: all 0.2s ease;
     text-decoration: none;
     color: inherit;
     display: block;
-    position: relative;
-    overflow: hidden;
-    min-height: 150px;
-    width: 100%;
+    height: 100%;
+    min-height: 140px;
 }
 
 .action-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 12px 30px rgba(0,0,0,0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     text-decoration: none;
     color: inherit;
-}
-
-.action-card:focus {
-    text-decoration: none;
-    color: inherit;
-    outline: none;
 }
 
 .action-icon {
-    font-size: 2.5rem;
-    margin-bottom: 1rem;
+    font-size: 2rem;
+    color: var(--primary-color);
+    margin-bottom: 0.75rem;
     display: block;
-    line-height: 1.2;
-    /* Fallback for browsers that don't support gradient text */
-    color: #667eea;
-    /* Gradient text for supported browsers */
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    transition: all 0.3s ease;
 }
 
-/* Ensure Font Awesome icons in action cards are visible */
 .action-icon i {
-    font-size: 2.5rem;
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    /* Fallback for browsers that don't support gradient text */
-    color: #667eea;
+    font-size: 2rem;
+    color: var(--primary-color);
 }
 
-.action-card:hover .action-icon i {
-    transform: scale(1.1);
-    filter: drop-shadow(0 4px 8px rgba(102, 126, 234, 0.3));
+.action-card h6 {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 0.5rem;
 }
 
-.progress-bar-custom {
-    height: 8px;
-    border-radius: 4px;
-    background: linear-gradient(135deg, #667eea, #764ba2);
-}
-
-.table-admin {
-    background: white;
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+.action-card p {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    margin-bottom: 0;
 }
 
 .fade-in {
-    animation: fadeIn 0.6s ease-out;
+    animation: fadeIn 0.4s ease-out;
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
+    from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
-.pulse {
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
+/* Ensure all badges have white text */
+.badge {
+    color: white !important;
 }
 </style>
 
-<div class="container-fluid">
+<div class="container-fluid" style="padding-left: 50px; padding-right: 50px;">
     <!-- Header -->
     <div class="row mb-4 mt-4 fade-in">
         <div class="col-12">
@@ -771,7 +566,7 @@ if ($ratingsTableExists) {
     <div class="row g-4">
         <!-- Subject Performance -->
         <div class="col-md-6 fade-in" style="animation-delay: 0.9s;">
-            <div class="admin-card">
+            <div class="dashboard-card">
                 <h5 class="mb-3"><i class="fas fa-book text-primary"></i> Subject Performance</h5>
                 <?php if($subjectStats->num_rows > 0): ?>
                     <div class="table-responsive">
@@ -811,7 +606,7 @@ if ($ratingsTableExists) {
 
         <!-- Evaluator Performance -->
         <div class="col-md-6 fade-in" style="animation-delay: 1.0s;">
-            <div class="admin-card">
+            <div class="dashboard-card">
                 <h5 class="mb-3"><i class="fas fa-chalkboard-teacher text-info"></i> Evaluator Performance</h5>
                 <?php if($evaluatorPerf->num_rows > 0): ?>
                     <div class="table-responsive">
@@ -853,7 +648,7 @@ if ($ratingsTableExists) {
 
         <!-- Evaluator Ratings -->
         <div class="col-12 fade-in" style="animation-delay: 1.2s;">
-            <div class="admin-card">
+            <div class="dashboard-card">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="mb-0"><i class="fas fa-star text-warning"></i> Evaluator Ratings</h5>
                     <div class="d-flex gap-3">
@@ -1119,11 +914,11 @@ document.addEventListener('DOMContentLoaded', function() {
 <div class="modal fade" id="allFeedbackModal" tabindex="-1" aria-labelledby="allFeedbackModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
-            <div class="modal-header bg-gradient-success text-white">
+            <div class="modal-header">
                 <h5 class="modal-title" id="allFeedbackModalLabel">
-                    <i class="fas fa-comments"></i> All Evaluator Feedback
+                    <i class="fas fa-comments text-success"></i> All Evaluator Feedback
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <div id="allFeedbackContent">
@@ -1195,7 +990,7 @@ document.getElementById('allFeedbackModal').addEventListener('show.bs.modal', fu
                                     <div class="d-flex justify-content-between align-items-start mb-2">
                                         <h6 class="card-title mb-0">${feedback.evaluator_name}</h6>
                                         <div class="d-flex align-items-center">
-                                            <span class="badge bg-warning text-dark me-2">${feedback.overall_rating}/5</span>
+                                            <span class="badge bg-warning me-2">${feedback.overall_rating}/5</span>
                                             <div class="stars-small">${stars(feedback.overall_rating)}</div>
                                         </div>
                                     </div>
@@ -1248,14 +1043,19 @@ document.getElementById('allFeedbackModal').addEventListener('show.bs.modal', fu
 </script>
 
 <style>
-.bg-gradient-success {
-    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-}
-
 .blockquote-sm {
     border-left: 3px solid #dee2e6;
     padding-left: 1rem;
     margin-left: 0;
+}
+
+.modal-header {
+    background-color: var(--bg-light);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header .btn-close {
+    filter: none;
 }
 </style>
 
@@ -1263,11 +1063,11 @@ document.getElementById('allFeedbackModal').addEventListener('show.bs.modal', fu
 <div class="modal fade" id="detailedRatingsModal" tabindex="-1" aria-labelledby="detailedRatingsModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
-            <div class="modal-header bg-gradient-primary text-white">
+            <div class="modal-header">
                 <h5 class="modal-title" id="detailedRatingsModalLabel">
-                    <i class="fas fa-star"></i> Detailed Evaluator Ratings
+                    <i class="fas fa-star text-warning"></i> Detailed Evaluator Ratings
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <div id="ratingsContent">
@@ -1416,7 +1216,7 @@ function scrollToRatings() {
     
     ratingsElements.forEach(element => {
         if (element.textContent.includes('Evaluator Ratings')) {
-            ratingsSection = element.closest('.admin-card, .col-12');
+            ratingsSection = element.closest('.dashboard-card, .col-12');
         }
     });
     
@@ -1438,10 +1238,6 @@ function scrollToRatings() {
 <style>
 .stars-small .fas {
     font-size: 0.8rem;
-}
-
-.bg-gradient-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
 .badge.bg-outline-secondary {

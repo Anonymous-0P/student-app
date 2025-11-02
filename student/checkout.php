@@ -42,41 +42,138 @@ $pageTitle = "Checkout";
 require_once('../includes/header.php');
 ?>
 
-<div class="container">
-    <!-- Header -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <nav aria-label="breadcrumb">
+<link rel="stylesheet" href="../moderator/css/moderator-style.css">
+
+<style>
+/* Additional styles for checkout */
+.checkout-content {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: #ffffff;
+    color: var(--text-dark);
+    line-height: 1.6;
+}
+
+.checkout-breadcrumb {
+    background: transparent;
+    padding: 0;
+    margin-bottom: 1rem;
+}
+
+.checkout-breadcrumb .breadcrumb-item a {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+.checkout-breadcrumb .breadcrumb-item.active {
+    color: var(--text-muted);
+}
+
+.order-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 0.75rem;
+    margin-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.order-item:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.order-item-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 0.25rem;
+}
+
+.order-item-code {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.order-item-price {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+    font-size: 0.875rem;
+}
+
+.summary-total {
+    display: flex;
+    justify-content: space-between;
+    padding-top: 1rem;
+    margin-top: 1rem;
+    border-top: 2px solid var(--border-color);
+    font-size: 1.125rem;
+    font-weight: 600;
+}
+
+.security-notice {
+    background: var(--bg-light);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.security-notice i {
+    color: var(--success-color);
+    font-size: 1.25rem;
+}
+
+.sticky-sidebar {
+    position: sticky;
+    top: 20px;
+}
+</style>
+
+<div class="checkout-content">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="container">
+            <nav aria-label="breadcrumb" class="checkout-breadcrumb">
                 <ol class="breadcrumb">
                     <li class="breadcrumb-item"><a href="browse_exams.php">Browse Exams</a></li>
                     <li class="breadcrumb-item"><a href="cart.php">Cart</a></li>
                     <li class="breadcrumb-item active">Checkout</li>
                 </ol>
             </nav>
-            <h2><i class="fas fa-credit-card text-primary"></i> Checkout</h2>
-            <p class="text-muted">Complete your purchase to get instant access to your selected exams</p>
+            <h1><i class="fas fa-credit-card"></i> Checkout</h1>
+            <p>Complete your purchase to get instant access to your selected exams</p>
         </div>
     </div>
 
-    <!-- Error Alert -->
-    <?php if (isset($_SESSION['checkout_error'])): ?>
-        <div class="alert alert-danger alert-dismissible fade show">
-            <i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($_SESSION['checkout_error']) ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-        <?php unset($_SESSION['checkout_error']); ?>
-    <?php endif; ?>
+    <div class="container">
 
-    <div class="row">
-        <!-- Payment Form -->
-        <div class="col-lg-8">
-            <form id="checkoutForm" action="process_payment.php" method="POST">
-                <!-- Billing Information -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-user"></i> Billing Information</h5>
-                    </div>
-                    <div class="card-body">
+        <!-- Error Alert -->
+        <?php if (isset($_SESSION['checkout_error'])): ?>
+            <div class="alert alert-danger alert-dismissible fade show">
+                <i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($_SESSION['checkout_error']) ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            <?php unset($_SESSION['checkout_error']); ?>
+        <?php endif; ?>
+
+        <div class="row">
+            <!-- Payment Form -->
+            <div class="col-lg-8">
+                <form id="checkoutForm" action="process_payment.php" method="POST">
+                    <!-- Billing Information -->
+                    <div class="dashboard-card mb-4">
+                        <h5 class="mb-3"><i class="fas fa-user"></i> Billing Information</h5>
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Full Name *</label>
@@ -100,15 +197,11 @@ require_once('../includes/header.php');
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Payment Method -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-credit-card"></i> Payment Method</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="alert alert-info">
+                    <!-- Payment Method -->
+                    <div class="dashboard-card mb-4">
+                        <h5 class="mb-3"><i class="fas fa-credit-card"></i> Payment Method</h5>
+                        <div class="alert alert-info mb-3">
                             <i class="fas fa-info-circle"></i>
                             <strong>Demo Mode:</strong> This is a dummy payment gateway for demonstration purposes. 
                             No real payment will be processed.
@@ -157,11 +250,9 @@ require_once('../includes/header.php');
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Terms and Conditions -->
-                <div class="card mb-4">
-                    <div class="card-body">
+                    <!-- Terms and Conditions -->
+                    <div class="dashboard-card mb-4">
                         <div class="form-check">
                             <input type="checkbox" name="terms_agreed" class="form-check-input" id="termsCheck" required>
                             <label class="form-check-label" for="termsCheck">
@@ -176,58 +267,51 @@ require_once('../includes/header.php');
                             </label>
                         </div>
                     </div>
-                </div>
 
-                <?php csrf_input(); ?>
-            </form>
-        </div>
+                    <?php csrf_input(); ?>
+                </form>
+            </div>
 
-        <!-- Order Summary -->
-        <div class="col-lg-4">
-            <div class="card sticky-top">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="fas fa-receipt"></i> Order Summary</h5>
-                </div>
-                <div class="card-body">
+            <!-- Order Summary -->
+            <div class="col-lg-4">
+                <div class="dashboard-card sticky-sidebar">
+                    <h5 class="mb-3"><i class="fas fa-receipt"></i> Order Summary</h5>
+                    
                     <!-- Items List -->
                     <div class="mb-3">
                         <?php foreach ($items as $item): ?>
-                            <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
-                                <div class="flex-grow-1">
-                                    <h6 class="mb-1 small"><?= htmlspecialchars($item['code']) ?></h6>
-                                    <div class="small text-muted">
-                                        <?= htmlspecialchars($item['name']) ?>
-                                    </div>
+                            <div class="order-item">
+                                <div>
+                                    <div class="order-item-title"><?= htmlspecialchars($item['name']) ?></div>
+                                    <div class="order-item-code"><?= htmlspecialchars($item['code']) ?></div>
                                 </div>
-                                <div class="text-end">
-                                    <strong>$<?= number_format($item['price'], 2) ?></strong>
-                                </div>
+                                <div class="order-item-price">₹<?= number_format($item['price'], 2) ?></div>
                             </div>
                         <?php endforeach; ?>
                     </div>
 
                     <!-- Totals -->
-                    <div class="d-flex justify-content-between mb-2">
+                    <div class="summary-row">
                         <span>Subtotal (<?= count($items) ?> items)</span>
-                        <span>$<?= number_format($total, 2) ?></span>
+                        <span>₹<?= number_format($total, 2) ?></span>
                     </div>
-                    <div class="d-flex justify-content-between mb-2">
+                    <div class="summary-row">
                         <span>Tax</span>
-                        <span>$0.00</span>
+                        <span>₹0.00</span>
                     </div>
-                    <div class="d-flex justify-content-between mb-2">
+                    <div class="summary-row">
                         <span>Processing Fee</span>
-                        <span>$0.00</span>
+                        <span>₹0.00</span>
                     </div>
-                    <hr>
-                    <div class="d-flex justify-content-between mb-3">
-                        <h5>Total</h5>
-                        <h5 class="text-primary">$<?= number_format($total, 2) ?></h5>
+                    
+                    <div class="summary-total">
+                        <span>Total</span>
+                        <span style="color: var(--primary-color);">₹<?= number_format($total, 2) ?></span>
                     </div>
 
                     <!-- Action Buttons -->
-                    <div class="d-grid gap-2">
-                        <button type="submit" form="checkoutForm" class="btn btn-primary btn-lg">
+                    <div class="d-grid gap-2 mt-3">
+                        <button type="submit" form="checkoutForm" class="btn btn-primary">
                             <i class="fas fa-lock"></i> Complete Payment
                         </button>
                         <a href="cart.php" class="btn btn-outline-secondary">
@@ -236,13 +320,9 @@ require_once('../includes/header.php');
                     </div>
 
                     <!-- Security Notice -->
-                    <div class="mt-3 p-3 bg-light rounded">
-                        <div class="d-flex align-items-center">
-                            <i class="fas fa-shield-alt text-success me-2"></i>
-                            <small class="text-muted">
-                                Your payment information is secure and encrypted
-                            </small>
-                        </div>
+                    <div class="security-notice">
+                        <i class="fas fa-shield-alt"></i>
+                        <small>Your payment information is secure and encrypted</small>
                     </div>
                 </div>
             </div>
@@ -305,31 +385,6 @@ require_once('../includes/header.php');
         </div>
     </div>
 </div>
-
-<style>
-.sticky-top {
-    top: 20px;
-}
-
-.card {
-    border: 1px solid #e3e6f0;
-}
-
-.form-control:focus, .form-select:focus {
-    border-color: #4e73df;
-    box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25);
-}
-
-.btn-primary {
-    background-color: #4e73df;
-    border-color: #4e73df;
-}
-
-.btn-primary:hover {
-    background-color: #2e59d9;
-    border-color: #2e59d9;
-}
-</style>
 
 <script>
 // Format card number input

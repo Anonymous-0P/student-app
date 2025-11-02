@@ -83,9 +83,8 @@ if(isset($_POST['signup'])){
                     <label class="form-label">Division <span class="text-danger">*</span></label>
                     <select name="division" class="form-select" required>
                         <option value="">Select Division</option>
-                        <option value="10th" <?= (isset($_POST['division']) && $_POST['division'] == '10th') ? 'selected' : '' ?>>10th Standard(State Baord)</option>
-                        <option value="11th" <?= (isset($_POST['division']) && $_POST['division'] == '11th') ? 'selected' : '' ?>>11th Standard</option>
-                        <option value="12th" <?= (isset($_POST['division']) && $_POST['division'] == '12th') ? 'selected' : '' ?>>12th Standard(State Board)</option>
+                        <option value="10th" <?= (isset($_POST['division']) && $_POST['division'] == '10th') ? 'selected' : '' ?>>10th Standard (State Board)</option>
+                        <option value="12th" <?= (isset($_POST['division']) && $_POST['division'] == '12th') ? 'selected' : '' ?>>12th Standard (State Board)</option>
                     </select>
                 </div>
                 <div class="col-12">

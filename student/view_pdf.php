@@ -195,6 +195,13 @@ header('Expires: 0');
                     </small>
                 </div>
                 <div class="col-auto">
+                    <?php if(!empty($submission['annotated_pdf_url']) && file_exists('../' . $submission['annotated_pdf_url'])): ?>
+                        <a href="../<?= htmlspecialchars($submission['annotated_pdf_url']) ?>" 
+                           target="_blank"
+                           class="btn btn-success btn-sm me-2">
+                            <i class="fas fa-check-circle me-1"></i> View Annotated Version
+                        </a>
+                    <?php endif; ?>
                     <a href="view_submissions.php" class="btn btn-light btn-sm">
                         <i class="fas fa-arrow-left me-1"></i> Back to Submissions
                     </a>

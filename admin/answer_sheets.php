@@ -150,22 +150,9 @@ $recentActivity = $conn->query("
 ");
 ?>
 
+<link rel="stylesheet" href="../moderator/css/moderator-style.css">
+
 <style>
-.answer-card {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    transition: all 0.3s ease;
-    border: none;
-    margin-bottom: 1rem;
-}
-
-.answer-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-}
-
 .status-badge {
     font-size: 0.75rem;
     padding: 0.4rem 0.8rem;
@@ -173,13 +160,8 @@ $recentActivity = $conn->query("
     font-weight: 600;
 }
 
-.status-pending { background: linear-gradient(135deg, #ffc107, #fd7e14); color: white; }
-.status-approved { background: linear-gradient(135deg, #28a745, #20c997); color: white; }
-.status-rejected { background: linear-gradient(135deg, #dc3545, #c82333); color: white; }
-.status-under_review { background: linear-gradient(135deg, #007bff, #0056b3); color: white; }
-
 .file-preview {
-    border: 2px dashed #dee2e6;
+    border: 2px dashed var(--border-color);
     border-radius: 8px;
     padding: 1rem;
     text-align: center;
@@ -187,35 +169,27 @@ $recentActivity = $conn->query("
 }
 
 .file-preview:hover {
-    border-color: #007bff;
-}
-
-.stat-card {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-radius: 15px;
-    padding: 1.5rem;
-    text-align: center;
-    transition: transform 0.3s ease;
-}
-
-.stat-card:hover {
-    transform: translateY(-5px);
+    border-color: var(--primary-color);
 }
 
 .fade-in {
-    animation: fadeIn 0.6s ease-out;
+    animation: fadeIn 0.4s ease-out;
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
+    from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
+}
+
+/* Ensure all badges have white text */
+.badge {
+    color: white !important;
 }
 </style>
 
-<div class="container-fluid">
+<div class="container-fluid" style="padding-left: 50px; padding-right: 50px;">
     <!-- Header -->
-    <div class="row mb-4 fade-in">
+    <div class="row mb-4 mt-4 fade-in">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
                 <div>

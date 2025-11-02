@@ -217,58 +217,31 @@ $studentStats = $conn->query("SELECT
     FROM users WHERE role = 'student'")->fetch_assoc();
 ?>
 
+<link rel="stylesheet" href="../moderator/css/moderator-style.css">
+
 <style>
-.student-card {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    transition: all 0.3s ease;
-    border: none;
-    margin-bottom: 1rem;
-}
-
-.student-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-}
-
 .status-active { 
-    color: #28a745; 
+    color: var(--success-color);
     font-weight: 600; 
 }
 
 .status-inactive { 
-    color: #dc3545; 
+    color: var(--danger-color);
     font-weight: 600; 
 }
 
-.modal-content {
-    border-radius: 15px;
-    border: none;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-}
-
 .fade-in {
-    animation: fadeIn 0.6s ease-out;
+    animation: fadeIn 0.4s ease-out;
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(30px); }
+    from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
-.stats-card {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    text-align: center;
-    border-radius: 12px;
-    padding: 1.5rem;
-    transition: transform 0.3s ease;
-}
-
-.stats-card:hover {
-    transform: translateY(-5px);
+/* Ensure all badges have white text */
+.badge {
+    color: white !important;
 }
 
 .btn-group-actions {
@@ -373,16 +346,16 @@ $studentStats = $conn->query("SELECT
 }
 
 .search-filters {
-    background: #f8f9fa;
-    border-radius: 10px;
+    background: var(--bg-light);
+    border-radius: 8px;
     padding: 1rem;
     margin-bottom: 1.5rem;
 }
 </style>
 
-<div class="container-fluid">
+<div class="container-fluid" style="padding-left: 50px; padding-right: 50px;">
     <!-- Header -->
-    <div class="row mb-4 fade-in">
+    <div class="row mb-4 mt-4 fade-in">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
@@ -392,7 +365,7 @@ $studentStats = $conn->query("SELECT
                     <p class="text-muted mb-0">Manage student accounts, profiles, and academic information</p>
                 </div>
                 <div>
-                    <button class="btn btn-success" onclick="showAddModal()">
+                    <button class="btn btn-primary" onclick="showAddModal()">
                         <i class="fas fa-user-plus"></i> Add New Student
                     </button>
                 </div>
@@ -465,7 +438,7 @@ $studentStats = $conn->query("SELECT
     <!-- Students Table -->
     <div class="row fade-in">
         <div class="col-12">
-            <div class="student-card">
+            <div class="dashboard-card">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="mb-0">
                         <i class="fas fa-list"></i> Students List
@@ -586,7 +559,6 @@ $studentStats = $conn->query("SELECT
                             <select class="form-select" name="division" id="division" required>
                                 <option value="">Select Division</option>
                                 <option value="10th">10th Standard</option>
-                                <option value="11th">11th Standard</option>
                                 <option value="12th">12th Standard</option>
                             </select>
                         </div>
