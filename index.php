@@ -1,4 +1,10 @@
-<?php include('includes/header.php'); ?>
+<?php 
+// Start session before output
+session_start(); 
+
+// Include the header file
+include('includes/header.php'); 
+?>
 
 <!-- Close the Bootstrap container for full-width design -->
 </div><!-- /.container -->
@@ -101,6 +107,23 @@
         justify-content: center;
         flex-wrap: wrap;
         margin-top: 40px;
+        width: 100%;
+    }
+
+    /* Center single button on mobile */
+    @media (max-width: 600px) {
+        .cta-buttons {
+            flex-direction: column;
+            align-items: center;
+            gap: 0;
+        }
+        .cta-buttons .btn {
+            width: 90vw;
+            max-width: 320px;
+            margin-left: auto;
+            margin-right: auto;
+            display: block;
+        }
     }
 
     .btn {
@@ -357,40 +380,30 @@
 <!-- Hero Section -->
 <section class="hero">
     <div class="hero-content">
-        <h1>Welcome to <span class="highlight">Student Upload Portal</span></h1>
-        <p>Upload your answer sheets as images with automatic PDF conversion. Submit assignments digitally and track your academic progress with ease.</p>
+        <h1>Welcome to <span class="highlight">ThetaExams</span></h1>
+        <p>Browse and purchase access to premium exam materials. Take tests, submit answer sheets digitally, and track your academic progress with ease.</p>
         
         <?php if(!isset($_SESSION['user_id'])): ?>
             <div class="cta-buttons">
-                <a href="auth/signup.php" class="btn btn-primary">
-                    📝 Create Student Account
-                </a>
-                <a href="auth/login.php" class="btn btn-secondary">
-                    🔐 Student Login
-                </a>
+                <a href="student/browse_exams.php" class="btn btn-primary">Browse Exams</a>
             </div>
         <?php else: ?>
             <div class="cta-buttons">
-                <?php if($_SESSION['role'] == 'student'): ?>
-                    <a href="student/dashboard.php" class="btn btn-primary">
-                        📚 Go to Dashboard
-                    </a>
+                <?php if(isset($_SESSION['role']) && $_SESSION['role'] == 'student'): ?>
+                    <div style="width:100%;display:flex;justify-content:center;">
+                        <a href="student/dashboard.php" class="btn btn-primary">📚 Go to Dashboard</a>
+                    </div>
                 <?php elseif($_SESSION['role'] == 'admin'): ?>
-                    <a href="admin/dashboard.php" class="btn btn-primary">
-                        🛠️ Admin Panel
-                    </a>
+                    <a href="admin/dashboard.php" class="btn btn-primary">🛠️ Admin Panel</a>
                 <?php elseif($_SESSION['role'] == 'moderator'): ?>
-                    <a href="moderator/dashboard.php" class="btn btn-primary">
-                        👨‍💼 Moderator Panel
-                    </a>
+                    <a href="moderator/dashboard.php" class="btn btn-primary">👨‍💼 Moderator Panel</a>
                 <?php elseif($_SESSION['role'] == 'evaluator'): ?>
-                    <a href="evaluator/dashboard.php" class="btn btn-primary">
-                        👨‍🏫 Evaluator Panel
-                    </a>
+                    <a href="evaluator/dashboard.php" class="btn btn-primary">👨‍🏫 Evaluator Panel</a>
+                <?php else: ?>
+                    <a href="auth/login.php" class="btn btn-primary">🔐 Complete Login</a>
                 <?php endif; ?>
             </div>
         <?php endif; ?>
-        
     </div>
 </section>
 
@@ -450,24 +463,24 @@
             <div class="step">
                 <div class="step-number">1</div>
                 <div class="step-content">
-                    <h3>Create Student Account</h3>
-                    <p>Sign up as a student in seconds. Provide your roll number, course details, and get instant access.</p>
+                    <h3>Browse Exam Catalog</h3>
+                    <p>Explore our catalog of exams and subjects. Preview details and pricing before making a selection.</p>
                 </div>
             </div>
             
             <div class="step">
                 <div class="step-number">2</div>
                 <div class="step-content">
-                    <h3>Upload Answer Sheets</h3>
-                    <p>Students capture photos of their work and upload them directly through the platform.</p>
+                    <h3>Purchase & Access</h3>
+                    <p>Select exams, add them to your cart, and complete the purchase process to gain access to exam materials.</p>
                 </div>
             </div>
             
             <div class="step">
                 <div class="step-number">3</div>
                 <div class="step-content">
-                    <h3>Review & Evaluate</h3>
-                    <p>Faculty members access converted PDFs, review submissions, and provide feedback efficiently.</p>
+                    <h3>Study & Submit</h3>
+                    <p>Access your purchased materials from the dashboard and submit your work when ready for evaluation.</p>
                 </div>
             </div>
         </div>
@@ -477,47 +490,22 @@
 <!-- CTA Section -->
 <section class="cta-section">
     <div class="cta-content">
-        <h2>Ready to Start Submitting?</h2>
-        <p>Join thousands of students who are already transforming their academic submission experience with our platform.</p>
-        
+        <h2>Ready to Start Learning?</h2>
+        <p>Join thousands of students who are accessing premium exam materials and enhancing their academic performance with our platform.</p>
         <?php if(!isset($_SESSION['user_id'])): ?>
             <div class="cta-buttons">
-                <a href="auth/signup.php" class="btn btn-primary">
-                    Create Student Account Now
-                </a>
+                <a href="student/browse_exams.php" class="btn btn-primary">Browse Exams</a>
             </div>
         <?php else: ?>
             <div class="cta-buttons">
                 <?php if($_SESSION['role'] == 'student'): ?>
-                    <a href="student/dashboard.php" class="btn btn-primary">
-                        Upload Your First Assignment
-                    </a>
+                    <a href="student/dashboard.php" class="btn btn-primary">Upload Your First Assignment</a>
                 <?php else: ?>
-                    <a href="admin/dashboard.php" class="btn btn-primary">
-                        Access Admin Panel
-                    </a>
+                    <a href="admin/dashboard.php" class="btn btn-primary">Access Admin Panel</a>
                 <?php endif; ?>
             </div>
         <?php endif; ?>
     </div>
 </section>
 
-<!-- Custom footer for landing page -->
-<footer class="mt-auto" style="background: rgba(255, 255, 255, 0.98); border-top: 1px solid rgba(255, 255, 255, 0.2); padding: 2rem 0;">
-    <div class="container">
-        <div class="row align-items-center">
-            <div class="col-md-6">
-                <p class="mb-0" style="color: #4a5568;">&copy; <?= date('Y') ?> Student Photo App. All rights reserved.</p>
-            </div>
-            <div class="col-md-6 text-md-end">
-                <small style="color: #4a5568;">
-                    Built with <span style="color: #e53e3e;">&hearts;</span> for education
-                </small>
-            </div>
-        </div>
-    </div>
-</footer>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
-</body>
-</html>
+<?php include('includes/footer.php'); ?>

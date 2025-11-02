@@ -150,22 +150,9 @@ $recentActivity = $conn->query("
 ");
 ?>
 
+<link rel="stylesheet" href="../moderator/css/moderator-style.css">
+
 <style>
-.answer-card {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    transition: all 0.3s ease;
-    border: none;
-    margin-bottom: 1rem;
-}
-
-.answer-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-}
-
 .status-badge {
     font-size: 0.75rem;
     padding: 0.4rem 0.8rem;
@@ -173,13 +160,8 @@ $recentActivity = $conn->query("
     font-weight: 600;
 }
 
-.status-pending { background: linear-gradient(135deg, #ffc107, #fd7e14); color: white; }
-.status-approved { background: linear-gradient(135deg, #28a745, #20c997); color: white; }
-.status-rejected { background: linear-gradient(135deg, #dc3545, #c82333); color: white; }
-.status-under_review { background: linear-gradient(135deg, #007bff, #0056b3); color: white; }
-
 .file-preview {
-    border: 2px dashed #dee2e6;
+    border: 2px dashed var(--border-color);
     border-radius: 8px;
     padding: 1rem;
     text-align: center;
@@ -187,49 +169,34 @@ $recentActivity = $conn->query("
 }
 
 .file-preview:hover {
-    border-color: #007bff;
-}
-
-.stat-card {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-radius: 15px;
-    padding: 1.5rem;
-    text-align: center;
-    transition: transform 0.3s ease;
-}
-
-.stat-card:hover {
-    transform: translateY(-5px);
+    border-color: var(--primary-color);
 }
 
 .fade-in {
-    animation: fadeIn 0.6s ease-out;
+    animation: fadeIn 0.4s ease-out;
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
+    from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
+}
+
+/* Ensure all badges have white text */
+.badge {
+    color: white !important;
 }
 </style>
 
-<div class="container-fluid">
+<div class="container-fluid" style="padding-left: 50px; padding-right: 50px;">
     <!-- Header -->
-    <div class="row mb-4 fade-in">
+    <div class="row mb-4 mt-4 fade-in">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <h1 class="h3 mb-2">Answer Sheet Management</h1>
-                    <p class="text-muted mb-0">Review, verify, and manage student submissions</p>
+                    <!-- <p class="text-muted mb-0">Review, verify, and manage student submissions</p> -->
                 </div>
-                <div class="d-flex gap-2">
-                    <button class="btn btn-success" onclick="bulkAction('approve')" id="bulkApproveBtn" disabled>
-                        ✅ Bulk Approve
-                    </button>
-                    <button class="btn btn-danger" onclick="bulkAction('reject')" id="bulkRejectBtn" disabled>
-                        ❌ Bulk Reject
-                    </button>
-                </div>
+                
             </div>
         </div>
     </div>
@@ -249,7 +216,7 @@ $recentActivity = $conn->query("
     <?php endif; ?>
 
     <!-- Statistics -->
-    <div class="row g-3 mb-4 fade-in">
+    <!-- <div class="row g-3 mb-4 fade-in">
         <div class="col-md-3">
             <div class="stat-card">
                 <div class="h4 mb-1"><?= $statusCounts['pending'] ?? 0 ?></div>
@@ -274,7 +241,7 @@ $recentActivity = $conn->query("
                 <div>Under Review</div>
             </div>
         </div>
-    </div>
+    </div> -->
 
     <div class="row">
         <!-- Main Content -->
@@ -282,16 +249,7 @@ $recentActivity = $conn->query("
             <!-- Filters -->
             <div class="answer-card fade-in">
                 <form method="GET" class="row g-3">
-                    <div class="col-md-3">
-                        <label class="form-label">Status</label>
-                        <select name="status" class="form-select">
-                            <option value="">All Status</option>
-                            <option value="pending" <?= $status_filter == 'pending' ? 'selected' : '' ?>>Pending</option>
-                            <option value="approved" <?= $status_filter == 'approved' ? 'selected' : '' ?>>Approved</option>
-                            <option value="rejected" <?= $status_filter == 'rejected' ? 'selected' : '' ?>>Rejected</option>
-                            <option value="under_review" <?= $status_filter == 'under_review' ? 'selected' : '' ?>>Under Review</option>
-                        </select>
-                    </div>
+                    
                     <div class="col-md-3">
                         <label class="form-label">Subject</label>
                         <select name="subject" class="form-select">
@@ -345,10 +303,7 @@ $recentActivity = $conn->query("
                                         <th width="40"></th>
                                         <th>Student</th>
                                         <th>Subject</th>
-                                        <th>File</th>
-                                        <th>Status</th>
-                                        <th>Uploaded</th>
-                                        <th>Actions</th>
+                                        <th>Submition Time</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -364,47 +319,15 @@ $recentActivity = $conn->query("
                                         <td>
                                             <div class="fw-semibold"><?= htmlspecialchars($submission['subject_name']) ?></div>
                                             <div class="small text-muted"><?= htmlspecialchars($submission['subject_code']) ?></div>
+                                        
+                                            
                                         </td>
-                                        <?php
-                                            $displayName = $submission['original_filename'] ?? ($submission['pdf_url'] ?? 'Submission #' . $submission['id']);
-                                            $displayName = $displayName ?: 'Submission #' . $submission['id'];
-                                            if (strpos($displayName, '/') !== false || strpos($displayName, "\\") !== false) {
-                                                $displayName = basename($displayName);
-                                            }
-                                            $pdfUrl = $submission['pdf_url'] ?? ($submission['pdf_path'] ?? '');
-                                            if ($pdfUrl && !preg_match('#^https?://#', $pdfUrl)) {
-                                                $pdfUrl = '../' . ltrim($pdfUrl, '/');
-                                            }
-                                        ?>
-                                        <td>
-                                            <div class="d-flex align-items-center">
-                                                <i class="fas fa-file-pdf text-danger me-2"></i>
-                                                <div>
-                                                    <div class="small"><?= htmlspecialchars($displayName) ?></div>
-                                                    <?php if(!empty($pdfUrl)): ?>
-                                                        <a href="<?= htmlspecialchars($pdfUrl) ?>" target="_blank" class="btn btn-sm btn-outline-primary">
-                                                            📄 View PDF
-                                                        </a>
-                                                    <?php else: ?>
-                                                        <span class="badge bg-secondary">No file</span>
-                                                    <?php endif; ?>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span class="status-badge status-<?= $submission['status'] ?>">
-                                                <?= ucfirst(str_replace('_', ' ', $submission['status'])) ?>
-                                            </span>
-                                        </td>
+                                        
                                         <td>
                                             <div><?= date('M j, Y', strtotime($submission['created_at'])) ?></div>
                                             <div class="small text-muted"><?= date('g:i A', strtotime($submission['created_at'])) ?></div>
                                         </td>
-                                        <td>
-                                            <button class="btn btn-sm btn-primary" onclick="reviewSubmission(<?= htmlspecialchars(json_encode($submission)) ?>)">
-                                                📝 Review
-                                            </button>
-                                        </td>
+                                      
                                     </tr>
                                     <?php endwhile; ?>
                                 </tbody>

@@ -103,29 +103,16 @@ if(isset($_POST['upload'])){
     }
 }
 
-// Load subject and active template
-$stmt = $conn->prepare("SELECT s.*, qt.id AS template_id, qt.easy_count, qt.medium_count, qt.hard_count, qt.total_marks, qt.duration_minutes
-                        FROM subjects s JOIN question_templates qt ON qt.subject_id=s.id AND qt.is_active=1
-                        WHERE s.id=? AND s.is_active=1 LIMIT 1");
+// Load subject information
+$stmt = $conn->prepare("SELECT * FROM subjects WHERE id=? AND is_active=1 LIMIT 1");
 $stmt->bind_param('i', $subject_id);
 $stmt->execute();
-$template = $stmt->get_result()->fetch_assoc();
-if (!$template) { echo '<div class="alert alert-warning">No active template for this subject.</div>'; include('../includes/footer.php'); exit; }
-
-// Helper to get randomized questions by difficulty
-function pick_questions($conn, $subject_id, $difficulty, $count) {
-    if ($count <= 0) return [];
-    $stmt = $conn->prepare("SELECT id, question_text, marks FROM questions WHERE subject_id=? AND difficulty=? AND is_active=1 ORDER BY RAND() LIMIT ?");
-    $stmt->bind_param('isi', $subject_id, $difficulty, $count);
-    $stmt->execute();
-    $res = $stmt->get_result();
-    return $res->fetch_all(MYSQLI_ASSOC);
+$subject = $stmt->get_result()->fetch_assoc();
+if (!$subject) { 
+    echo '<div class="alert alert-warning">Subject not found or inactive.</div>'; 
+    include('../includes/footer.php'); 
+    exit; 
 }
-
-$questions = [];
-$questions = array_merge($questions, pick_questions($conn, $subject_id, 'easy', (int)$template['easy_count']));
-$questions = array_merge($questions, pick_questions($conn, $subject_id, 'medium', (int)$template['medium_count']));
-$questions = array_merge($questions, pick_questions($conn, $subject_id, 'hard', (int)$template['hard_count']));
 ?>
 
 <style>
@@ -177,14 +164,13 @@ $questions = array_merge($questions, pick_questions($conn, $subject_id, 'hard', 
 
 <div class="row">
     <div class="col-lg-10 col-xl-9">
-        <!-- Question Paper Section -->
+        <!-- Answer Sheet Submission Section -->
         <div class="question-paper">
             <div class="d-flex justify-content-between align-items-start mb-4">
                 <div>
-                    <h2 class="mb-1 text-primary"><?php echo htmlspecialchars($template['code'].' - '.$template['name']); ?></h2>
+                    <h2 class="mb-1 text-primary"><?php echo htmlspecialchars($subject['code'].' - '.$subject['name']); ?></h2>
                     <div class="text-muted">
-                        <i class="fas fa-clock"></i> Duration: <?php echo (int)$template['duration_minutes']; ?> minutes • 
-                        <i class="fas fa-star"></i> Total Marks: <?php echo (int)$template['total_marks']; ?>
+                        <i class="fas fa-upload"></i> Answer Sheet Submission Portal
                     </div>
                 </div>
                 <div>
@@ -196,35 +182,27 @@ $questions = array_merge($questions, pick_questions($conn, $subject_id, 'hard', 
 
             <!-- Instructions -->
             <div class="alert alert-info mb-4">
-                <h6><i class="fas fa-info-circle"></i> Instructions:</h6>
+                <h6><i class="fas fa-info-circle"></i> Submission Instructions:</h6>
                 <ul class="mb-0">
-                    <li>Read all questions carefully before starting</li>
-                    <li>Answer all questions in the order given</li>
-                    <li>Upload clear photos of your handwritten answers below</li>
+                    <li>Take clear photos of your handwritten answer sheets</li>
+                    <li>Ensure all pages are visible and well-lit</li>
+                    <li>Upload all pages of your answers below</li>
+                    <li>The system will automatically convert your images to PDF</li>
                 </ul>
             </div>
 
-            <!-- Questions -->
-            <?php if (empty($questions)): ?>
-                <div class="alert alert-warning">
-                    <i class="fas fa-exclamation-triangle"></i> No questions available for this template.
+            <!-- Info Card -->
+            <div class="alert alert-primary mb-4">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-file-upload fa-2x text-primary"></i>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h5 class="mb-1">Ready to Submit Your Answer Sheet?</h5>
+                        <p class="mb-0">Use the upload section below to submit your handwritten answers. You can take photos using your device camera or select existing images from your gallery.</p>
+                    </div>
                 </div>
-            <?php else: ?>
-                <div class="questions-section">
-                    <h4 class="mb-3"><i class="fas fa-question-circle"></i> Questions</h4>
-                    <?php $i=1; foreach($questions as $q): ?>
-                        <div class="question-item">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <div class="flex-grow-1">
-                                    <h6 class="text-primary mb-2">Question <?php echo $i++; ?></h6>
-                                    <p class="mb-2"><?php echo nl2br(htmlspecialchars($q['question_text'])); ?></p>
-                                </div>
-                                <span class="badge bg-primary ms-3"><?php echo (int)$q['marks']; ?> marks</span>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            <?php endif; ?>
+            </div>
         </div>
 
         <!-- Upload Answer Sheet Section -->
