@@ -62,6 +62,92 @@ include '../includes/header.php';
 ?>
 
 <link href="css/evaluator-style.css" rel="stylesheet">
+<style>
+    /* Table responsive styling */
+    .table-responsive {
+        margin-top: 1rem;
+    }
+    
+    .table th {
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 0.75rem;
+        vertical-align: middle;
+    }
+    
+    .table td {
+        padding: 0.75rem;
+        vertical-align: middle;
+    }
+    
+    .table-hover tbody tr:hover {
+        background-color: rgba(0, 123, 255, 0.05);
+        cursor: pointer;
+    }
+    
+    /* Badge styling */
+    .badge {
+        font-size: 0.75rem;
+        padding: 0.375rem 0.625rem;
+        font-weight: 600;
+        color: #ffffff !important;
+    }
+    
+    /* Mobile responsive */
+    @media (max-width: 991.98px) {
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .table {
+            min-width: 900px;
+        }
+        
+        .table th,
+        .table td {
+            padding: 0.5rem;
+            font-size: 0.875rem;
+        }
+        
+        .btn-group .btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+        
+        .btn-group .btn i {
+            font-size: 0.75rem;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .dashboard-card h5 {
+            font-size: 1rem;
+        }
+        
+        .table th,
+        .table td {
+            padding: 0.375rem;
+            font-size: 0.8rem;
+        }
+        
+        .btn-group {
+            flex-wrap: wrap;
+            gap: 0.25rem;
+        }
+        
+        .btn-group .btn {
+            padding: 0.25rem 0.375rem;
+            font-size: 0.7rem;
+        }
+        
+        .small {
+            font-size: 0.7rem;
+        }
+    }
+</style>
 
 <div class="evaluator-content">
 <div class="container-fluid">
@@ -87,56 +173,45 @@ include '../includes/header.php';
                     <span class="badge bg-warning"><?= count($pendingAssignments) ?></span>
                 </h5>
             <?php if (!empty($pendingAssignments)): ?>
-                <?php foreach ($pendingAssignments as $assignment): ?>
-                    <div class="assignment-card">
-                        <div class="row align-items-center">
-                            <div class="col-md-6">
-                                <h6 class="mb-2">
-                                    <span class="badge bg-warning">PENDING</span>
-                                    <?= htmlspecialchars($assignment['subject_code']) ?> - <?= htmlspecialchars($assignment['subject_name']) ?>
-                                </h6>
-                                <div class="mb-2">
-                                    <strong>Student:</strong> <?= htmlspecialchars($assignment['student_name']) ?>
-                                </div>
-                                <div class="mb-2">
-                                    <strong>Submitted:</strong> 
-                                    <span class="text-muted"><?= date('M j, Y g:i A', strtotime($assignment['submitted_at'])) ?></span>
-                                </div>
-                                <div class="mb-2">
-                                    <strong>Assigned:</strong> 
-                                    <span class="text-muted"><?= date('M j, Y g:i A', strtotime($assignment['assigned_at'])) ?></span>
-                                </div>
-                            </div>
-                            <!-- <div class="col-md-3">
-                                <div class="file-info">
-                                    <div class="small text-muted mb-1">File Details</div>
-                                    <div class="fw-bold"><?= htmlspecialchars($assignment['original_filename'] ?: 'submission.pdf') ?></div>
-                                    <div class="small text-muted">
-                                        Size: <?= number_format($assignment['file_size'] / 1024, 2) ?> KB
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Status</th>
+                                <th>Subject</th>
+                                <th>Student</th>
+                                <th>Submitted</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($pendingAssignments as $assignment): ?>
+                            <tr>
+                                <td><span class="badge bg-warning">PENDING</span></td>
+                                <td>
+                                    <div class="fw-semibold"><?= htmlspecialchars($assignment['subject_code']) ?></div>
+                                    <div class="small text-muted"><?= htmlspecialchars($assignment['subject_name']) ?></div>
+                                </td>
+                                <td><?= htmlspecialchars($assignment['student_name']) ?></td>
+                                <td>
+                                    <div><?= date('M j, Y', strtotime($assignment['submitted_at'])) ?></div>
+                                    <div class="small text-muted"><?= date('g:i A', strtotime($assignment['submitted_at'])) ?></div>
+                                </td>
+                                <td>
+                                    <div class="btn-group">
+                                        <button class="btn btn-success btn-sm" onclick="handleAssignment(<?= $assignment['assignment_id'] ?>, 'accept')">
+                                            <i class="fas fa-check"></i> Accept
+                                        </button>
+                                        <button class="btn btn-danger btn-sm" onclick="handleAssignment(<?= $assignment['assignment_id'] ?>, 'deny')">
+                                            <i class="fas fa-times"></i> Decline
+                                        </button>
                                     </div>
-                                    <?php if ($assignment['pdf_url']): ?>
-                                        <a href="<?= htmlspecialchars($assignment['pdf_url']) ?>" target="_blank" class="btn btn-sm btn-outline-primary mt-2">
-                                            <i class="fas fa-file-pdf"></i> View PDF
-                                        </a>
-                                    <?php endif; ?>
-                                </div>
-                            </div> -->
-                            <div class="col-md-3 text-end">
-                                <div class="btn-group">
-                                    <button class="btn btn-success btn-sm" onclick="handleAssignment(<?= $assignment['assignment_id'] ?>, 'accept')">
-                                        <i class="fas fa-check"></i> Accept
-                                    </button>
-                                    <button class="btn btn-danger btn-sm" onclick="handleAssignment(<?= $assignment['assignment_id'] ?>, 'deny')">
-                                        <i class="fas fa-times"></i> Decline
-                                    </button>
-                                    <button class="btn btn-outline-secondary btn-sm" onclick="showDetails(<?= $assignment['assignment_id'] ?>, '<?= htmlspecialchars($assignment['student_name']) ?>', '<?= htmlspecialchars($assignment['subject_code']) ?>')">
-                                        <i class="fas fa-info-circle"></i> Details
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
             <?php else: ?>
                 <div class="text-center py-4">
                     <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
@@ -156,35 +231,46 @@ include '../includes/header.php';
                     <span class="badge bg-success"><?= count($acceptedAssignments) ?></span>
                 </h5>
             <?php if (!empty($acceptedAssignments)): ?>
-                <?php foreach ($acceptedAssignments as $assignment): ?>
-                    <div class="assignment-card">
-                        <div class="row align-items-center">
-                            <div class="col-md-6">
-                                <h6 class="mb-2">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Status</th>
+                                <th>Subject</th>
+                                <th>Student</th>
+                                <th>Accepted</th>
+                                <th>Evaluation Status</th>
+                                <th>Score</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($acceptedAssignments as $assignment): ?>
+                            <tr>
+                                <td>
                                     <?php if ($assignment['evaluation_status'] === 'completed'): ?>
                                         <span class="badge bg-success">COMPLETED</span>
                                     <?php else: ?>
                                         <span class="badge bg-info">IN PROGRESS</span>
                                     <?php endif; ?>
-                                    <?= htmlspecialchars($assignment['subject_code']) ?> - <?= htmlspecialchars($assignment['subject_name']) ?>
-                                </h6>
-                                <div class="mb-2">
-                                    <strong>Student:</strong> <?= htmlspecialchars($assignment['student_name']) ?>
-                                </div>
-                                <div class="mb-2">
-                                    <strong>Accepted:</strong> 
-                                    <span class="text-muted"><?= date('M j, Y g:i A', strtotime($assignment['responded_at'])) ?></span>
-                                </div>
-                                <div class="mb-2">
-                                    <strong>Status:</strong> 
+                                </td>
+                                <td>
+                                    <div class="fw-semibold"><?= htmlspecialchars($assignment['subject_code']) ?></div>
+                                    <div class="small text-muted"><?= htmlspecialchars($assignment['subject_name']) ?></div>
+                                </td>
+                                <td><?= htmlspecialchars($assignment['student_name']) ?></td>
+                                <td>
+                                    <div><?= date('M j, Y', strtotime($assignment['responded_at'])) ?></div>
+                                    <div class="small text-muted"><?= date('g:i A', strtotime($assignment['responded_at'])) ?></div>
+                                </td>
+                                <td>
                                     <?php if ($assignment['evaluation_status'] === 'completed'): ?>
                                         <span class="badge bg-success">
-                                            <i class="fas fa-check-circle me-1"></i>Evaluation Completed
+                                            <i class="fas fa-check-circle me-1"></i>Completed
                                         </span>
                                         <?php if ($assignment['evaluated_at']): ?>
                                             <div class="small text-muted mt-1">
-                                                <i class="fas fa-calendar-check me-1"></i>
-                                                Completed: <?= date('M j, Y g:i A', strtotime($assignment['evaluated_at'])) ?>
+                                                <?= date('M j, Y g:i A', strtotime($assignment['evaluated_at'])) ?>
                                             </div>
                                         <?php endif; ?>
                                     <?php else: ?>
@@ -192,53 +278,41 @@ include '../includes/header.php';
                                             <i class="fas fa-clock me-1"></i>In Progress
                                         </span>
                                     <?php endif; ?>
-                                </div>
-                                <?php if ($assignment['evaluation_status'] === 'completed' && $assignment['marks_obtained'] !== null): ?>
-                                <div class="mb-2">
-                                    <strong>Final Score:</strong> 
-                                    <span class="text-primary fw-bold">
-                                        <?= number_format($assignment['marks_obtained'], 2) ?> / <?= number_format($assignment['max_marks'], 2) ?>
+                                </td>
+                                <td>
+                                    <?php if ($assignment['evaluation_status'] === 'completed' && $assignment['marks_obtained'] !== null): ?>
+                                        <div class="text-primary fw-bold">
+                                            <?= number_format($assignment['marks_obtained'], 2) ?> / <?= number_format($assignment['max_marks'], 2) ?>
+                                        </div>
                                         <?php 
                                         $percentage = $assignment['max_marks'] > 0 ? ($assignment['marks_obtained'] / $assignment['max_marks']) * 100 : 0;
                                         ?>
-                                        (<?= number_format($percentage, 1) ?>%)
-                                    </span>
-                                </div>
-                                <?php endif; ?>
-                            </div>
-                            <div class="col-md-3">
-                                <!-- <div class="file-info">
-                                    <div class="small text-muted mb-1">File Details</div>
-                                    <div class="fw-bold"><?= htmlspecialchars($assignment['original_filename'] ?: 'submission.pdf') ?></div>
-                                    <div class="small text-muted">
-                                        Size: <?= number_format($assignment['file_size'] / 1024, 2) ?> KB
-                                    </div>
-                                    <?php if ($assignment['pdf_url']): ?>
-                                        <a href="<?= htmlspecialchars($assignment['pdf_url']) ?>" target="_blank" class="btn btn-sm btn-outline-primary mt-2">
-                                            <i class="fas fa-file-pdf"></i> View PDF
-                                        </a>
-                                    <?php endif; ?>
-                                </div> -->
-                            </div>
-                            <div class="col-md-3 text-end">
-                                <div class="btn-group">
-                                    <?php if ($assignment['evaluation_status'] === 'completed'): ?>
-                                        <a href="evaluate.php?id=<?= $assignment['submission_id'] ?>" class="btn btn-success btn-sm">
-                                            <i class="fas fa-eye"></i> View
-                                        </a>
-                                        <button class="btn btn-outline-success btn-sm" onclick="showEvaluationSummary(<?= $assignment['assignment_id'] ?>)">
-                                            <i class="fas fa-chart-bar"></i> Summary
-                                        </button>
+                                        <div class="small text-muted">(<?= number_format($percentage, 1) ?>%)</div>
                                     <?php else: ?>
-                                        <a href="evaluate.php?id=<?= $assignment['submission_id'] ?>" class="btn btn-primary btn-sm">
-                                            <i class="fas fa-edit"></i> Continue
-                                        </a>
+                                        <span class="text-muted">-</span>
                                     <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
+                                </td>
+                                <td>
+                                    <div class="btn-group">
+                                        <?php if ($assignment['evaluation_status'] === 'completed'): ?>
+                                            <a href="evaluate.php?id=<?= $assignment['submission_id'] ?>" class="btn btn-success btn-sm">
+                                                <i class="fas fa-eye"></i> View
+                                            </a>
+                                            <button class="btn btn-outline-success btn-sm" onclick="showEvaluationSummary(<?= $assignment['assignment_id'] ?>)">
+                                                <i class="fas fa-chart-bar"></i> Summary
+                                            </button>
+                                        <?php else: ?>
+                                            <a href="evaluate.php?id=<?= $assignment['submission_id'] ?>" class="btn btn-primary btn-sm">
+                                                <i class="fas fa-edit"></i> Continue
+                                            </a>
+                                        <?php endif; ?>
+                                    </div>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
             <?php else: ?>
                 <div class="text-center py-4">
                     <i class="fas fa-tasks fa-3x text-muted mb-3"></i>

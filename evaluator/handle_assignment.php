@@ -151,6 +151,42 @@ try {
         ]);
         $studentNotifyStmt->execute([$assignment['student_id'], $studentTitle, $studentMessage, $submission_id, $metadata]);
         
+        // Send email notification to student
+        try {
+            // Get student email and name
+            $studentStmt = $pdo->prepare("SELECT name, email FROM users WHERE id = ?");
+            $studentStmt->execute([$assignment['student_id']]);
+            $studentInfo = $studentStmt->fetch(PDO::FETCH_ASSOC);
+            
+            // Get subject name
+            $subjectStmt = $pdo->prepare("SELECT name FROM subjects WHERE id = ?");
+            $subjectStmt->execute([$subject_id]);
+            $subjectInfo = $subjectStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($studentInfo && $subjectInfo) {
+                require_once('../includes/mail_helper.php');
+                $emailResult = sendEvaluationCompleteEmail(
+                    $studentInfo['email'],
+                    $studentInfo['name'],
+                    $subject_code,
+                    $subjectInfo['name'],
+                    0, // marks not yet evaluated
+                    0, // max marks not yet evaluated
+                    0, // percentage not yet evaluated
+                    '', // grade not yet evaluated
+                    '', // remarks not yet evaluated
+                    $submission_id
+                );
+                
+                if (!$emailResult['success']) {
+                    error_log("Failed to send acceptance email to student: " . $emailResult['message']);
+                }
+            }
+        } catch (Exception $e) {
+            error_log("Error sending acceptance email: " . $e->getMessage());
+            // Don't fail the whole operation if email fails
+        }
+        
         $message = 'Assignment accepted successfully! You are now responsible for evaluating this submission.';
         
     } else { // deny

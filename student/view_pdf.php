@@ -136,6 +136,33 @@ header('Expires: 0');
             position: relative;
         }
         
+        /* Mobile responsive adjustments */
+        @media (max-width: 768px) {
+            .pdf-header {
+                padding: 0.5rem 0.75rem !important;
+            }
+            
+            .pdf-header h5 {
+                font-size: 0.9rem !important;
+                margin-bottom: 0.25rem !important;
+            }
+            
+            .pdf-header .small,
+            .pdf-header small {
+                font-size: 0.7rem !important;
+            }
+            
+            .pdf-header .btn {
+                padding: 0.375rem 0.75rem !important;
+                font-size: 0.8rem !important;
+            }
+            
+            .pdf-viewer-container {
+                height: calc(100vh - 80px) !important;
+                margin: 0.5rem !important;
+            }
+        }
+        
         .pdf-embed {
             width: 100%;
             height: 100%;
@@ -184,11 +211,11 @@ header('Expires: 0');
                 <div class="col">
                     <h5 class="mb-0">
                         <i class="fas fa-file-pdf me-2"></i>
-                        Your Submission - <?= htmlspecialchars($submission['subject_code'] ?? 'Unknown Subject') ?>
+                        Your Submission
                     </h5>
                     <small class="opacity-75">
                         <?= htmlspecialchars($submission['subject_name'] ?? 'Unknown Subject') ?>
-                        | Submitted: <?= date('M j, Y g:i A', strtotime($submission['created_at'])) ?>
+                        
                         <?php if ($submission['marks'] !== null): ?>
                         | Marks: <?= number_format((float)$submission['marks'], 1) ?>
                         <?php endif; ?>
@@ -197,13 +224,13 @@ header('Expires: 0');
                 <div class="col-auto">
                     <?php if(!empty($submission['annotated_pdf_url']) && file_exists('../' . $submission['annotated_pdf_url'])): ?>
                         <a href="../<?= htmlspecialchars($submission['annotated_pdf_url']) ?>" 
-                           target="_blank"
+            
                            class="btn btn-success btn-sm me-2">
                             <i class="fas fa-check-circle me-1"></i> View Annotated Version
                         </a>
                     <?php endif; ?>
                     <a href="view_submissions.php" class="btn btn-light btn-sm">
-                        <i class="fas fa-arrow-left me-1"></i> Back to Submissions
+                        <i class="fas fa-arrow-left me-1"></i> Go Back
                     </a>
                 </div>
             </div>

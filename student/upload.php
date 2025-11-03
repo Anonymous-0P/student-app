@@ -155,22 +155,64 @@ $subjectsStmt->bind_param("i", $_SESSION['user_id']);
 $subjectsStmt->execute();
 $subjectsResult = $subjectsStmt->get_result();
 
+$isIndexPage = false;
 include('../includes/header.php');
 ?>
+
+<link href="../moderator/css/moderator-style.css" rel="stylesheet">
+<style>
+/* Fix button hover styles */
+.btn-primary:hover,
+.btn-success:hover,
+.btn-outline-primary:hover,
+.btn-outline-secondary:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.btn-primary:hover {
+    background-color: #0056b3 !important;
+    border-color: #0056b3 !important;
+    color: white !important;
+}
+
+.btn-success:hover {
+    background-color: #157347 !important;
+    border-color: #157347 !important;
+    color: white !important;
+}
+
+.btn-outline-primary:hover {
+    background-color: #0d6efd !important;
+    border-color: #0d6efd !important;
+    color: white !important;
+}
+
+.btn-outline-secondary:hover {
+    background-color: #6c757d !important;
+    border-color: #6c757d !important;
+    color: white !important;
+}
+</style>
+
+<?php require_once('includes/sidebar.php'); ?>
+
+<div class="dashboard-layout">
+    <div class="main-content">
 
 <div class="row">
     <div class="col-lg-9 col-xl-8">
         <div class="page-card">
-            <h2 class="mb-3">Upload Answers</h2>
-            <div id="upload-status" class="mb-3"></div>
+            <div id="upload-status" class="mb-2"></div>
             
             <!-- Camera Capture Section -->
-            <div class="mb-4">
-                <h5 class="mb-3">📸 Capture and Upload Answersheet</h5>
+            <div class="mb-2">
+                <h5 class="mb-3">Capture and Upload</h5>
                 <div class="camera-section">
                     <video id="camera-preview" class="mb-3" style="width: 100%; max-width: 400px; height: 300px; background: #f8f9fa; border: 2px dashed #dee2e6; border-radius: 8px; display: none;"></video>
                     <canvas id="photo-canvas" style="display: none;"></canvas>
-                    <div class="camera-controls mb-3">
+                    <div class="camera-controls mb-1">
                         <button type="button" id="start-camera" class="btn btn-outline-primary me-2">
                             📷 Open Camera
                         </button>
@@ -222,9 +264,9 @@ include('../includes/header.php');
                     <?php endif; ?>
                 </div>
                 <div>
-                    <label class="form-label">�📁 Or Select Images / PDF from Device</label>
+                    <label class="form-label">📁 Or Select Images / PDF from Device</label>
                     <input type="file" name="device_files" multiple accept="image/*,application/pdf" class="form-control" capture="environment">
-                    <small>Allowed: JPG, PNG, GIF (will be merged into a PDF locally) or a single PDF. Max <?= $maxFiles; ?> images.</small>
+                    <small>Allowed: JPG, PNG, or a single PDF. Max <?= $maxFiles; ?> images.</small>
                 </div>
                 <div class="d-flex gap-2">
                     <button type="submit" name="upload" class="btn btn-primary">Upload Answersheet</button>
@@ -577,5 +619,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+
+    </div>
+</div>
 
 <?php include('../includes/footer.php'); ?>

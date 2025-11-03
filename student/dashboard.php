@@ -89,26 +89,29 @@ $purchasedStmt->execute();
 $purchasedSubjects = $purchasedStmt->get_result();
 
 $pageTitle = "Student Dashboard";
+$isIndexPage = false;
 require_once('../includes/header.php');
 ?>
 
 <link href="css/student-style.css" rel="stylesheet">
 
-<div class="student-content">
-<div class="container">
+<?php require_once('includes/sidebar.php'); ?>
+
+<div class="dashboard-layout">
+    <div class="main-content ">
+        <div class="container-fluid px-1">
     <!-- Welcome Header -->
     <div class="page-header">
         <div class="row">
             <div class="col-12">
                 <h1><i class="fas fa-home me-2"></i>Welcome back, <?= htmlspecialchars($user_info['name']) ?>!</h1>
-                <p>Track your progress and manage your exams</p>
             </div>
         </div>
     </div>
     
     <!-- Purchased Subjects Section -->
     <?php if ($purchasedSubjects->num_rows > 0): ?>
-    <div class="row mb-4">
+    <div class="row mb-2">
         <div class="col-12">
             <div class="dashboard-card">
                 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -207,20 +210,27 @@ require_once('../includes/header.php');
                                         <!-- Spacer -->
                                         <div class="mt-auto">
                                             <?php if ($subject['access_status'] !== 'expired'): ?>
-                                                <!-- View Paper Button -->
-                                                <?php if ($paperId && $paperFilePath): ?>
-                                                    <a href="pdf_viewer.php?paper_id=<?= $paperId ?>" 
-                                                       class="btn btn-primary w-100 mb-2" 
-                                                       style="border-radius: 8px; font-weight: 500;">
-                                                        <i class="fas fa-eye me-2"></i>View Paper
-                                                    </a>
-                                                <?php else: ?>
-                                                    <button class="btn btn-outline-secondary w-100 mb-2" 
-                                                            disabled 
-                                                            style="border-radius: 8px; font-weight: 500;">
-                                                        <i class="fas fa-file-alt me-2"></i>No Paper Available
-                                                    </button>
-                                                <?php endif; ?>
+                                                <!-- View Paper and Submit Buttons -->
+                                                <div class="d-flex gap-2 mb-2">
+                                                    <?php if ($paperId && $paperFilePath): ?>
+                                                        <a href="pdf_viewer.php?paper_id=<?= $paperId ?>" 
+                                                           class="btn btn-primary flex-fill" 
+                                                           style="border-radius: 8px; font-weight: 500;">
+                                                            <i class="fas fa-eye me-2"></i>View Paper
+                                                        </a>
+                                                        <a href="upload.php?subject_id=<?= $subject['id'] ?>" 
+                                                           class="btn btn-success flex-fill" 
+                                                           style="border-radius: 8px; font-weight: 500;">
+                                                            <i class="fas fa-upload me-2"></i>Submit
+                                                        </a>
+                                                    <?php else: ?>
+                                                        <button class="btn btn-outline-secondary w-100" 
+                                                                disabled 
+                                                                style="border-radius: 8px; font-weight: 500;">
+                                                            <i class="fas fa-file-alt me-2"></i>No Paper Available
+                                                        </button>
+                                                    <?php endif; ?>
+                                                </div>
                                                 
                                                 <!-- Access Granted Badge -->
                                                 <div class="text-center">
@@ -253,325 +263,9 @@ require_once('../includes/header.php');
         </div>
     </div>
     <?php endif; ?>
-    
-    <div class="row">
-        <div class="col-12 mb-4">
-            <div class="dashboard-card">
-                <h5><i class="fas fa-star me-2"></i>Evaluation Results</h5>
-                    <?php if ($recentEvaluations->num_rows === 0): ?>
-                        <div class="text-center py-4">
-                            <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
-                            <p class="text-muted">No submissions yet. Upload your first answer sheet to get started.</p>
-                            <a class="btn btn-primary" href="upload.php">
-                                <i class="fas fa-upload me-2"></i>Upload Answers
-                            </a>
-                        </div>
-                    <?php else: ?>
-                        <!-- Desktop Table View (hidden on mobile) -->
-                        <div class="d-none d-lg-block">
-                            <table class="table">
-                                <thead>
-                                        <tr>
-                                            <th>Subject</th>
-                                            <th>Status</th>
-                                            <th>Marks & Grade</th>
-                                            <th>Evaluator</th>
-                                            <th>Submitted</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                <?php 
-                                // Reset pointer for desktop table
-                                $recentEvaluations->data_seek(0);
-                                while($row = $recentEvaluations->fetch_assoc()): 
-                                    // Status badge styling
-                                    $statusClass = 'bg-warning';
-                                    if($row['status_display'] == 'Evaluated') $statusClass = 'bg-success';
-                                    if($row['status_display'] == 'Approved') $statusClass = 'bg-success';
-                                    if($row['status_display'] == 'Rejected') $statusClass = 'bg-danger';
-                                    if($row['status_display'] == 'Under Review') $statusClass = 'bg-info';
-                                    
-                                    // Create proper PDF viewer URL
-                                    $viewUrl = "view_pdf.php?submission_id=" . $row['id'];
-                                    
-                                    // Grade calculation
-                                    $percentage = $row['percentage'];
-                                    $grade = 'N/A';
-                                    if ($row['marks_obtained'] !== null && $row['max_marks'] > 0) {
-                                        if ($percentage >= 90) $grade = 'A+';
-                                        elseif ($percentage >= 80) $grade = 'A';
-                                        elseif ($percentage >= 70) $grade = 'B';
-                                        elseif ($percentage >= 60) $grade = 'C+';
-                                        elseif ($percentage >= 50) $grade = 'C';
-                                        else $grade = 'F';
-                                    }
-                                ?>
-                                    <tr>
-                                        <td>
-                                            <?php if($row['subject_code']): ?>
-                                                <div class="fw-semibold"><?= htmlspecialchars($row['subject_code']) ?></div>
-                                                <div class="small text-muted"><?= htmlspecialchars($row['subject_name']) ?></div>
-                                            <?php else: ?>
-                                                <span class="text-muted">No subject</span>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td>
-                                            <span class="badge <?= $statusClass ?>">
-                                                <?= htmlspecialchars($row['status_display']) ?>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <?php if($row['marks_obtained'] !== null && $row['max_marks'] > 0): ?>
-                                                <div class="fw-bold text-success">
-                                                    <?= number_format((float)$row['marks_obtained'], 1) ?> / <?= number_format((float)$row['max_marks'], 1) ?>
-                                                </div>
-                                                <div class="small">
-                                                    <span class="badge bg-primary"><?= number_format($percentage, 1) ?>%</span>
-                                                    <span class="badge bg-secondary ms-1">Grade: <?= $grade ?></span>
-                                                </div>
-                                            <?php else: ?>
-                                                <span class="text-muted">Not evaluated</span>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td>
-                                            <?php if($row['evaluator_name']): ?>
-                                                <div class="fw-semibold"><?= htmlspecialchars($row['evaluator_name']) ?></div>
-                                                <?php if($row['evaluated_at']): ?>
-                                                    <div class="small text-muted">
-                                                        <?= date('M j, Y g:i A', strtotime($row['evaluated_at'])) ?>
-                                                    </div>
-                                                <?php endif; ?>
-                                            <?php else: ?>
-                                                <span class="text-muted">Not assigned</span>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td>
-                                            <div><?= date('M j, Y', strtotime($row['created_at'])) ?></div>
-                                            <div class="small text-muted"><?= date('g:i A', strtotime($row['created_at'])) ?></div>
-                                        </td>
-                                        <td>
-                                            <div class="btn-group">
-                                                <a href="<?= htmlspecialchars($viewUrl) ?>" target="_blank" 
-                                                   class="btn btn-sm btn-outline-primary" title="View PDF">
-                                                    <i class="fas fa-eye"></i> View
-                                                </a>
-                                                <?php if(!empty($row['annotated_pdf_url']) && file_exists('../' . $row['annotated_pdf_url'])): ?>
-                                                    <a href="../<?= htmlspecialchars($row['annotated_pdf_url']) ?>" 
-                                                       target="_blank"
-                                                       class="btn btn-sm btn-success" 
-                                                       title="Download Annotated Answer Sheet">
-                                                        <i class="fas fa-download"></i> Download
-                                                    </a>
-                                                <?php endif; ?>
-                                                <?php if($row['evaluator_remarks']): ?>
-                                                    <button class="btn btn-sm btn-outline-info" 
-                                                            onclick="showEvaluationFeedback('<?= htmlspecialchars(addslashes($row['evaluator_remarks'])) ?>', '<?= htmlspecialchars($row['subject_code']) ?>', '<?= number_format($percentage, 1) ?>%', '<?= $grade ?>')"
-                                                            title="View Evaluation Feedback">
-                                                        💬 Feedback
-                                                    </button>
-                                                <?php endif; ?>
-                                                
-                                                <?php if($row['status_display'] == 'Evaluated' && $row['evaluator_id']): ?>
-                                                    <button class="btn btn-sm btn-outline-warning" 
-                                                            onclick="showRatingModal(<?= $row['evaluator_id'] ?>, '<?= htmlspecialchars($row['evaluator_name']) ?>', <?= $row['id'] ?>)"
-                                                            title="Rate Evaluator">
-                                                        ⭐ Rate
-                                                    </button>
-                                                <?php endif; ?>
-                                                
-                                            </div>
-                                        </td>
-                                    </tr>
-                                <?php endwhile; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                        
-                        <!-- Mobile Card View (hidden on desktop) -->
-                        <div class="d-block d-lg-none">
-                            <?php 
-                            // Reset the result pointer to display mobile cards
-                            $recentEvaluationsStmt->execute();
-                            $result = $recentEvaluationsStmt->get_result();
-                            while($row = $result->fetch_assoc()): 
-                                // Status badge styling
-                                $statusClass = 'bg-warning';
-                                if($row['status_display'] == 'Evaluated') $statusClass = 'bg-success';
-                                if($row['status_display'] == 'Approved') $statusClass = 'bg-success';
-                                if($row['status_display'] == 'Rejected') $statusClass = 'bg-danger';
-                                if($row['status_display'] == 'Under Review') $statusClass = 'bg-info';
-                                
-                                // Create proper PDF viewer URL
-                                $viewUrl = "view_pdf.php?submission_id=" . $row['id'];
-                                
-                                // Grade calculation
-                                $percentage = $row['percentage'];
-                                $grade = 'N/A';
-                                if ($row['marks_obtained'] !== null && $row['max_marks'] > 0) {
-                                    if ($percentage >= 90) $grade = 'A+';
-                                    elseif ($percentage >= 80) $grade = 'A';
-                                    elseif ($percentage >= 70) $grade = 'B';
-                                    elseif ($percentage >= 60) $grade = 'C';
-                                    elseif ($percentage >= 50) $grade = 'D';
-                                    else $grade = 'F';
-                                }
-                            ?>
-                            <div class="card mb-3 shadow-sm">
-                                <div class="card-body">
-                                    <!-- Subject Header -->
-                                    <div class="d-flex justify-content-between align-items-start mb-3">
-                                        <div class="flex-grow-1">
-                                            <?php if($row['subject_code']): ?>
-                                                <h5 class="card-title mb-1 text-primary"><?= htmlspecialchars($row['subject_code']) ?></h5>
-                                                <p class="text-muted small mb-0"><?= htmlspecialchars($row['subject_name']) ?></p>
-                                            <?php else: ?>
-                                                <h5 class="card-title text-muted">No subject</h5>
-                                            <?php endif; ?>
-                                        </div>
-                                        <span class="badge <?= $statusClass ?> text-white ms-2">
-                                            <?= htmlspecialchars($row['status_display']) ?>
-                                        </span>
-                                    </div>
-                                    
-                                    <!-- Submission Info -->
-                                    <div class="row g-2 mb-3">
-                                        <div class="col-6">
-                                            <div class="d-flex align-items-center text-muted small">
-                                                <i class="fas fa-calendar-alt me-2"></i>
-                                                <div>
-                                                    <div><?= date('M j, Y', strtotime($row['created_at'])) ?></div>
-                                                    <div class="text-muted"><?= date('g:i A', strtotime($row['created_at'])) ?></div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-6">
-                                            <?php if($row['evaluator_name']): ?>
-                                                <div class="d-flex align-items-center text-muted small">
-                                                    <i class="fas fa-user-check me-2"></i>
-                                                    <div>
-                                                        <div class="fw-semibold"><?= htmlspecialchars($row['evaluator_name']) ?></div>
-                                                        <?php if($row['evaluated_at']): ?>
-                                                            <div class="text-muted"><?= date('M j', strtotime($row['evaluated_at'])) ?></div>
-                                                        <?php endif; ?>
-                                                    </div>
-                                                </div>
-                                            <?php else: ?>
-                                                <div class="d-flex align-items-center text-muted small">
-                                                    <i class="fas fa-user-times me-2"></i>
-                                                    <span>Not assigned</span>
-                                                </div>
-                                            <?php endif; ?>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Marks Section -->
-                                    <?php if($row['marks_obtained'] !== null && $row['max_marks'] > 0): ?>
-                                        <div class="bg-light rounded p-3 mb-3">
-                                            <div class="row g-2 text-center">
-                                                <div class="col-4">
-                                                    <div class="fw-bold text-success fs-5">
-                                                        <?= number_format((float)$row['marks_obtained'], 1) ?>
-                                                    </div>
-                                                    <div class="small text-muted">Obtained</div>
-                                                </div>
-                                                <div class="col-4">
-                                                    <div class="fw-bold text-info fs-5">
-                                                        <?= number_format((float)$row['max_marks'], 1) ?>
-                                                    </div>
-                                                    <div class="small text-muted">Total</div>
-                                                </div>
-                                                <div class="col-4">
-                                                    <div class="fw-bold text-primary fs-5"><?= $grade ?></div>
-                                                    <div class="small text-muted"><?= number_format($percentage, 1) ?>%</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    <?php else: ?>
-                                        <div class="bg-light rounded p-3 mb-3 text-center">
-                                            <div class="text-muted">
-                                                <i class="fas fa-clock me-2"></i>
-                                                Not evaluated yet
-                                            </div>
-                                        </div>
-                                    <?php endif; ?>
-                                    
-                                    <!-- Action Buttons -->
-                                    <div class="row g-2">
-                                        <!-- Row 1: View PDF and Download -->
-                                        <div class="col-6">
-                                            <a href="<?= htmlspecialchars($viewUrl) ?>" target="_blank" 
-                                               class="btn btn-sm btn-outline-primary w-100">
-                                                <i class="fas fa-file-pdf me-1"></i>View PDF
-                                            </a>
-                                        </div>
-                                        <?php if(!empty($row['annotated_pdf_url']) && file_exists('../' . $row['annotated_pdf_url'])): ?>
-                                            <div class="col-6">
-                                                <a href="../<?= htmlspecialchars($row['annotated_pdf_url']) ?>" 
-                                                   target="_blank"
-                                                   class="btn btn-sm btn-success w-100">
-                                                    <i class="fas fa-download me-1"></i>Download
-                                                </a>
-                                            </div>
-                                        <?php endif; ?>
-                                        
-                                        <!-- Row 2: Feedback and Rate -->
-                                        <?php if($row['evaluator_remarks']): ?>
-                                            <div class="col-6">
-                                                <button class="btn btn-sm btn-outline-info w-100" 
-                                                        onclick="showEvaluationFeedback('<?= htmlspecialchars(addslashes($row['evaluator_remarks'])) ?>', '<?= htmlspecialchars($row['subject_code']) ?>', '<?= number_format($percentage, 1) ?>%', '<?= $grade ?>')">
-                                                    <i class="fas fa-comment me-1"></i>Feedback
-                                                </button>
-                                            </div>
-                                        <?php endif; ?>
-                                        
-                                        <?php if($row['status_display'] == 'Evaluated' && $row['evaluator_id']): ?>
-                                            <div class="col-6">
-                                                <button class="btn btn-sm btn-outline-warning w-100" 
-                                                        onclick="showRatingModal(<?= $row['evaluator_id'] ?>, '<?= htmlspecialchars($row['evaluator_name']) ?>', <?= $row['id'] ?>)">
-                                                    <i class="fas fa-star me-1"></i>Rate
-                                                </button>
-                                            </div>
-                                        <?php endif; ?>
-                                    </div>
-                                </div>
-                            </div>
-                            <?php endwhile; ?>
-                        </div>
-                    <?php endif; ?>
-            </div>
-        </div>
-    </div>
-
+  
     <!-- Quick Actions -->
-    <div class="row">
-        <div class="col-12 mb-4">
-            <div class="dashboard-card">
-                <h5><i class="fas fa-rocket me-2"></i>Quick Actions</h5>
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <a href="browse_exams.php" class="btn btn-success btn-lg w-100">
-                                <i class="fas fa-shopping-cart me-2"></i> Browse & Purchase
-                            </a>
-                            <small class="text-muted d-block mt-1">Explore available subjects</small>
-                        </div>
-                        <div class="col-md-4">
-                            <a href="question_papers.php" class="btn btn-info btn-lg w-100">
-                                <i class="fas fa-file-download me-2"></i> Question Papers
-                            </a>
-                            <small class="text-muted d-block mt-1">Access purchased subjects only</small>
-                        </div>
-                        <div class="col-md-4">
-                            <a href="view_submissions.php" class="btn btn-outline-primary btn-lg w-100">
-                                <i class="fas fa-history me-2"></i> View Submissions
-                            </a>
-                            <small class="text-muted d-block mt-1">Track your progress</small>
-                        </div>
-                    </div>
-            </div>
-        </div>
-    </div>
-
+    
     <!-- Student Performance Analysis Section -->
     <?php
     // Get detailed analytics data for student analysis
@@ -621,370 +315,9 @@ require_once('../includes/header.php');
     $gradeDistribution->execute();
     $gradeResults = $gradeDistribution->get_result();
     ?>
-
-    <!-- Performance Analysis Dashboard -->
-    <div class="row">
-        <div class="col-12 mb-4">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-gradient text-black d-flex justify-content-between align-items-center" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                    <h5 class="mb-0">📊 Student Performance Analysis</h5>
-                    <button class="btn btn-light btn-sm" onclick="toggleAnalysisSection()">
-                        <i class="fas fa-expand-arrows-alt"></i> Toggle
-                    </button>
-                </div>
-                <div class="card-body" id="analysisSection">
-                    
-                
-                    <div class="row mb-4">
-                        <!-- Subject Performance -->
-                        <div class="col-lg-6 mb-4">
-                            <div class="card h-100 border-0 bg-light text-black">
-                                <div class="card-header bg-info">
-                                    <h6 class="mb-0"><i class="fas fa-books me-2 "></i>Subject Performance</h6>
-                                </div>
-                                <div class="card-body">
-                                    <?php if ($subjectResults->num_rows > 0): ?>
-                                        <div class="table-responsive">
-                                            <table class="table table-sm">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Subject</th>
-                                                        <th class="text-center">Avg %</th>
-                                                        <th class="text-center">Best %</th>
-                                                        <th class="text-center">Count</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <?php while($subject = $subjectResults->fetch_assoc()): ?>
-                                                        <?php
-                                                        $avg = $subject['avg_percentage'] ? number_format($subject['avg_percentage'], 1) : 'N/A';
-                                                        $best = $subject['best_percentage'] ? number_format($subject['best_percentage'], 1) : 'N/A';
-                                                        $avgClass = '';
-                                                        if ($subject['avg_percentage'] >= 80) $avgClass = 'text-success';
-                                                        elseif ($subject['avg_percentage'] >= 60) $avgClass = 'text-warning';
-                                                        else $avgClass = 'text-danger';
-                                                        ?>
-                                                        <tr>
-                                                            <td class="fw-bold"><?= htmlspecialchars($subject['subject_code']) ?></td>
-                                                            <td class="text-center <?= $avgClass ?>"><?= $avg ?></td>
-                                                            <td class="text-center text-success"><?= $best ?></td>
-                                                            <td class="text-center"><?= $subject['evaluated_count'] ?></td>
-                                                        </tr>
-                                                    <?php endwhile; ?>
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    <?php else: ?>
-                                        <div class="text-center py-3">
-                                            <i class="fas fa-chart-line fa-2x text-muted mb-2"></i>
-                                            <p class="text-muted">No evaluated submissions yet</p>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Grade Distribution -->
-                        <div class="col-lg-6 mb-4">
-                            <div class="card h-100 border-0 bg-light">
-                                <div class="card-header bg-success text-white">
-                                    <h6 class="mb-0"><i class="fas fa-medal me-2"></i>Grade Distribution</h6>
-                                </div>
-                                <div class="card-body">
-                                    <?php if ($gradeResults->num_rows > 0): ?>
-                                        <?php 
-                                        $totalGrades = 0;
-                                        $grades = [];
-                                        $gradeResults->data_seek(0);
-                                        while($grade = $gradeResults->fetch_assoc()) {
-                                            $grades[] = $grade;
-                                            $totalGrades += $grade['count'];
-                                        }
-                                        ?>
-                                        <div class="row g-2">
-                                            <?php foreach($grades as $grade): ?>
-                                                <?php
-                                                $percentage = round(($grade['count'] / $totalGrades) * 100, 1);
-                                                $badgeClass = '';
-                                                switch($grade['grade']) {
-                                                    case 'A+': case 'A': $badgeClass = 'bg-success'; break;
-                                                    case 'B': $badgeClass = 'bg-info'; break;
-                                                    case 'C': $badgeClass = 'bg-warning'; break;
-                                                    case 'D': $badgeClass = 'bg-secondary'; break;
-                                                    case 'F': $badgeClass = 'bg-danger'; break;
-                                                }
-                                                ?>
-                                                <div class="col-6 col-md-4">
-                                                    <div class="text-center p-2 border rounded">
-                                                        <div class="badge <?= $badgeClass ?> mb-1"><?= $grade['grade'] ?></div>
-                                                        <div class="fw-bold"><?= $grade['count'] ?></div>
-                                                        <small class="text-muted"><?= $percentage ?>%</small>
-                                                    </div>
-                                                </div>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    <?php else: ?>
-                                        <div class="text-center py-3">
-                                            <i class="fas fa-medal fa-2x text-muted mb-2"></i>
-                                            <p class="text-muted">No grades available yet</p>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Performance Insights -->
-                    <!-- <div class="row">
-                        <div class="col-12">
-                            <div class="card border-0 bg-light">
-                                <div class="card-header bg-primary text-white">
-                                    <h6 class="mb-0"><i class="fas fa-lightbulb me-2"></i>Performance Insights & Study Recommendations</h6>
-                                </div>
-                                <div class="card-body">
-                                    <?php if ($stats['evaluated_submissions'] > 0): ?>
-                                        <?php
-                                        $totalEvaluated = $stats['evaluated_submissions'];
-                                        $avgPercentage = $stats['avg_percentage'] ?? 0;
-                                        
-                                        // Generate insights
-                                        $insights = [];
-                                        if ($avgPercentage >= 90) {
-                                            $insights[] = ['icon' => 'fas fa-star text-success', 'text' => 'Excellent performance! You\'re consistently scoring above 90%'];
-                                        } elseif ($avgPercentage >= 80) {
-                                            $insights[] = ['icon' => 'fas fa-thumbs-up text-success', 'text' => 'Great work! Your average is above 80%'];
-                                        } elseif ($avgPercentage >= 70) {
-                                            $insights[] = ['icon' => 'fas fa-chart-line text-warning', 'text' => 'Good progress! Try to aim for scores above 80%'];
-                                        } else {
-                                            $insights[] = ['icon' => 'fas fa-target text-danger', 'text' => 'Focus on improvement. Consider reviewing study methods'];
-                                        }
-
-                                        if ($totalEvaluated >= 10) {
-                                            $insights[] = ['icon' => 'fas fa-graduation-cap text-info', 'text' => 'Very active with ' . $totalEvaluated . ' evaluated submissions'];
-                                        } elseif ($totalEvaluated >= 5) {
-                                            $insights[] = ['icon' => 'fas fa-book text-info', 'text' => 'Good submission frequency - ' . $totalEvaluated . ' evaluations'];
-                                        }
-                                        ?>
-
-                                        <div class="row">
-                                            <div class="col-md-8">
-                                                <h6 class="text-primary mb-3"><i class="fas fa-brain me-1"></i>Key Insights:</h6>
-                                                <div class="list-group list-group-flush">
-                                                    <?php foreach($insights as $insight): ?>
-                                                        <div class="list-group-item border-0 px-0 py-2">
-                                                            <i class="<?= $insight['icon'] ?> me-2"></i>
-                                                            <span><?= $insight['text'] ?></span>
-                                                        </div>
-                                                    <?php endforeach; ?>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-4">
-                                                <h6 class="text-primary mb-3"><i class="fas fa-lightbulb me-1"></i>Study Tips:</h6>
-                                                <ul class="list-unstyled small">
-                                                    <?php if ($avgPercentage < 70): ?>
-                                                        <li class="mb-2"><i class="fas fa-check text-success me-1"></i>Review fundamentals before submissions</li>
-                                                        <li class="mb-2"><i class="fas fa-check text-success me-1"></i>Practice with sample questions</li>
-                                                    <?php endif; ?>
-                                                    <li class="mb-2"><i class="fas fa-check text-success me-1"></i>Review evaluator feedback carefully</li>
-                                                    <li class="mb-2"><i class="fas fa-check text-success me-1"></i>Focus on subjects with lower averages</li>
-                                                    <li class="mb-2"><i class="fas fa-check text-success me-1"></i>Maintain consistent submission schedule</li>
-                                                </ul>
-                                            </div>
-                                        </div>
-                                    <?php else: ?>
-                                        <div class="text-center py-4">
-                                            <i class="fas fa-lightbulb fa-3x text-muted mb-3"></i>
-                                            <h6 class="text-muted">No Analysis Available Yet</h6>
-                                            <p class="text-muted">Submit assignments to see personalized insights and performance analytics!</p>
-                                            <a href="subjects.php" class="btn btn-primary">Browse Subjects</a>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-                    </div> -->
-
-                    <!-- Report Generation -->
-                    <div class="text-center text-black mt-4">
-                        <div class="row g-2 justify-content-center">
-                            <div class="col-6 col-md-auto">
-                                <button class="btn btn-sm btn-success w-100" onclick="generateDetailedReport()">
-                                    <i class="fas fa-file-pdf me-1"></i>Generate Report
-                                </button>
-                            </div>
-                            <div class="col-6 col-md-auto">
-                                <button class="btn btn-sm btn-warning text-white w-100" style="background: linear-gradient(90deg,#f7971e,#ffd200); border: none;" onclick="exportAnalytics()">
-                                    <i class="fas fa-download me-1"></i>Export Data
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Recent Evaluation Results -->
     
-
-    <!-- Notifications Section -->
-    <!-- <div class="row">
-        <div class="col-12 mb-4">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="fas fa-bell me-2"></i>Recent Notifications</h5>
-                    <?php
-                    // Get recent notifications
-                    $notif_query = "
-                        SELECT * FROM notifications 
-                        WHERE user_id = ? AND type = 'evaluation_complete'
-                        ORDER BY created_at DESC 
-                        LIMIT 5
-                    ";
-                    
-                    try {
-                        $notif_stmt = $conn->prepare($notif_query);
-                        $notif_stmt->bind_param("i", $_SESSION['user_id']);
-                        $notif_stmt->execute();
-                        $notif_result = $notif_stmt->get_result();
-                        $has_notifications = $notif_result->num_rows > 0;
-                    } catch (Exception $e) {
-                        $has_notifications = false;
-                        $notifications = [];
-                    }
-                    ?>
-                    <?php if ($has_notifications): ?>
-                        <span class="badge bg-light text-info"><?= $notif_result->num_rows ?> New</span>
-                    <?php endif; ?>
-                </div>
-                <div class="card-body">
-                    <?php if ($has_notifications): ?>
-                        <div class="list-group list-group-flush">
-                            <?php while ($notif = $notif_result->fetch_assoc()): ?>
-                                <?php
-                                $metadata = json_decode($notif['metadata'], true) ?? [];
-                                $time_ago = time() - strtotime($notif['created_at']);
-                                if ($time_ago < 3600) {
-                                    $time_display = floor($time_ago / 60) . " minutes ago";
-                                } elseif ($time_ago < 86400) {
-                                    $time_display = floor($time_ago / 3600) . " hours ago";
-                                } else {
-                                    $time_display = floor($time_ago / 86400) . " days ago";
-                                }
-                                ?>
-                                <div class="list-group-item py-3 <?= $notif['is_read'] ? '' : 'bg-light border-start border-3 border-info' ?>">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <div class="flex-grow-1">
-                                            <h6 class="mb-1 text-primary"><?= htmlspecialchars($notif['title']) ?></h6>
-                                            <p class="mb-1 text-muted small"><?= htmlspecialchars($notif['message']) ?></p>
-                                            <small class="text-muted">
-                                                <i class="fas fa-clock me-1"></i><?= $time_display ?>
-                                                <?php if (isset($metadata['evaluator_name'])): ?>
-                                                    | <i class="fas fa-user me-1"></i><?= htmlspecialchars($metadata['evaluator_name']) ?>
-                                                <?php endif; ?>
-                                            </small>
-                                        </div>
-                                        <div class="text-end">
-                                            <a href="view_submissions.php" class="btn btn-sm btn-outline-info">
-                                                <i class="fas fa-eye me-1"></i>View
-                                            </a>
-                                        </div>
-                                    </div>
-                                </div>
-                            <?php endwhile; ?>
-                        </div>
-                    <?php else: ?>
-                        <div class="text-center py-4">
-                            <div class="text-muted mb-3">
-                                <i class="fas fa-bell-slash fa-3x"></i>
-                            </div>
-                            <h6 class="text-muted">No New Notifications</h6>
-                            <p class="text-muted small">You'll receive notifications here when your submissions are evaluated.</p>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
-    </div> -->
-
     <!-- Subject Selection -->
-    <div class="row">
-        <div class="col-12 mb-4">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="fas fa-file-alt text-primary me-2"></i>Available Question Papers</h5>
-                    <a href="question_papers.php" class="btn btn-outline-primary btn-sm">
-                        <i class="fas fa-eye me-1"></i> View All Papers
-                    </a>
-                </div>
-                <div class="card-body">
-                    <?php if ($subjects->num_rows === 0): ?>
-                        <div class="alert alert-info text-center py-4">
-                            <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
-                            <h6 class="text-muted">No Question Papers Available</h6>
-                            <p class="text-muted small mb-0">Check back later for new question papers</p>
-                        </div>
-                    <?php else: ?>
-                        <div class="row g-3">
-                            <?php 
-                            $subjectCount = 0;
-                            while(($row = $subjects->fetch_assoc()) && $subjectCount < 3): 
-                                $subjectCount++;
-                            ?>
-                                <div class="col-md-4">
-                                    <div class="card h-100 border-0 bg-light">
-                                        <div class="card-body text-center p-4">
-                                            <div class="mb-3">
-                                                <i class="fas fa-graduation-cap fa-2x text-primary"></i>
-                                            </div>
-                                            <h6 class="fw-bold mb-2"><?php echo htmlspecialchars($row['code']); ?></h6>
-                                            <p class="text-muted small mb-3"><?php echo htmlspecialchars($row['name']); ?></p>
-                                            <div class="small text-muted mb-3">
-                                                <?php if($row['paper_count'] > 0): ?>
-                                                    <i class="fas fa-file-alt me-1"></i><?php echo $row['paper_count']; ?> Paper(s) Available
-                                                <?php else: ?>
-                                                    <i class="fas fa-info-circle me-1"></i>No papers yet
-                                                <?php endif; ?>
-                                            </div>
-                                            <?php if($row['paper_count'] > 0): ?>
-                                                <a href="question_papers.php?subject_id=<?php echo (int)$row['id']; ?>" 
-                                                   class="btn btn-primary btn-sm w-100">
-                                                    <i class="fas fa-eye me-1"></i> View Papers
-                                                </a>
-                                            <?php else: ?>
-                                                <button class="btn btn-outline-secondary btn-sm w-100" disabled>
-                                                    <i class="fas fa-clock me-1"></i> Coming Soon
-                                                </button>
-                                            <?php endif; ?>
-                                        </div>
-                                    </div>
-                                </div>
-                            <?php endwhile; ?>
-                        </div>
-                        
-                        <div class="text-center mt-4">
-                            <a href="question_papers.php" class="btn btn-outline-primary">
-                                <i class="fas fa-plus-circle me-2"></i>View All Question Papers
-                            </a>
-                        </div>
-                    <?php endif; ?>
-                    
-                    <div class="mt-3 p-3 bg-light rounded">
-                        <div class="row align-items-center">
-                            <div class="col">
-                                <small class="text-muted">
-                                    <i class="fas fa-lightbulb me-1 text-warning"></i>
-                                    Click "View Papers" to access question papers for each subject
-                                </small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
+    
 <!-- Modal for evaluation feedback -->
 <div class="modal fade" id="feedbackModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -1115,6 +448,15 @@ require_once('../includes/header.php');
 @media (max-width: 768px) {
     .display-5 {
         font-size: 2rem;
+    }
+    
+    /* Stack View Paper and Submit buttons vertically on mobile */
+    .d-flex.gap-2 {
+        flex-direction: column !important;
+    }
+    
+    .d-flex.gap-2 .btn {
+        width: 100% !important;
     }
 }
 
@@ -1917,7 +1259,8 @@ function submitRating() {
 }
 </script>
 
-</div>
+        </div>
+    </div>
 </div>
 
 <?php require_once('../includes/footer.php'); ?>

@@ -39,10 +39,16 @@ if (count($items) === 0) {
 }
 
 $pageTitle = "Checkout";
+$isIndexPage = false;
 require_once('../includes/header.php');
 ?>
 
 <link rel="stylesheet" href="../moderator/css/moderator-style.css">
+
+<?php require_once('includes/sidebar.php'); ?>
+
+<div class="dashboard-layout">
+    <div class="main-content">
 
 <style>
 /* Additional styles for checkout */
@@ -144,13 +150,7 @@ require_once('../includes/header.php');
     <!-- Page Header -->
     <div class="page-header">
         <div class="container">
-            <nav aria-label="breadcrumb" class="checkout-breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="browse_exams.php">Browse Exams</a></li>
-                    <li class="breadcrumb-item"><a href="cart.php">Cart</a></li>
-                    <li class="breadcrumb-item active">Checkout</li>
-                </ol>
-            </nav>
+           
             <h1><i class="fas fa-credit-card"></i> Checkout</h1>
             <p>Complete your purchase to get instant access to your selected exams</p>
         </div>
@@ -405,5 +405,8 @@ document.getElementById('checkoutForm').addEventListener('submit', function(e) {
     }
 });
 </script>
+
+    </div>
+</div>
 
 <?php require_once('../includes/footer.php'); ?>

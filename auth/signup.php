@@ -41,9 +41,18 @@ if(isset($_POST['signup'])){
                 } else {
                     $stmt->bind_param("sssssss", $name, $email, $password, $role, $phone, $college_name, $division);
                     if($stmt->execute()){
-                        $success = "Student account created successfully! You can now login.";
+                        // Send welcome email
+                        require_once('../includes/mail_helper.php');
+                        $emailResult = sendWelcomeEmail($email, $name, 'Student');
+                        
+                        if ($emailResult['success']) {
+                            $success = "Student account created successfully! A welcome email has been sent to your email address. You can now login.";
+                        } else {
+                            $success = "Student account created successfully! You can now login. (Note: Welcome email could not be sent)";
+                        }
+                        
                         // Optional: Auto redirect after a delay
-                        header("refresh:2;url=login.php");
+                        header("refresh:3;url=login.php");
                     } else {
                         $error = "Error creating account: " . $conn->error;
                     }

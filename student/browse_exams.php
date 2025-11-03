@@ -6,16 +6,21 @@ require_once('../includes/functions.php');
 $is_logged_in = isset($_SESSION['user_id']) && $_SESSION['role'] === 'student';
 $student_id = $is_logged_in ? $_SESSION['user_id'] : null;
 
+// Initialize session cart if not exists
+if (!isset($_SESSION['guest_cart'])) {
+    $_SESSION['guest_cart'] = [];
+}
+
 // Check for access denied message
 $access_denied = isset($_GET['access_denied']) && $_GET['access_denied'] == '1';
 $subject_id_for_access = isset($_GET['subject_id']) ? (int)$_GET['subject_id'] : null;
 
 // Handle add to cart
-if (isset($_POST['add_to_cart']) && $is_logged_in) {
+if (isset($_POST['add_to_cart'])) {
     $subject_id = (int)$_POST['subject_id'];
     
     // Check if subject exists and get its price
-    $subject_check = $conn->prepare("SELECT id, price FROM subjects WHERE id = ? AND is_active = 1");
+    $subject_check = $conn->prepare("SELECT id, code, name, price FROM subjects WHERE id = ? AND is_active = 1");
     $subject_check->bind_param("i", $subject_id);
     $subject_check->execute();
     $subject_result = $subject_check->get_result();
@@ -23,22 +28,38 @@ if (isset($_POST['add_to_cart']) && $is_logged_in) {
     if ($subject_result->num_rows > 0) {
         $subject = $subject_result->fetch_assoc();
         
-        // Check if student already purchased this subject
-        $purchased_check = $conn->prepare("SELECT id FROM purchased_subjects WHERE student_id = ? AND subject_id = ? AND status = 'active'");
-        $purchased_check->bind_param("ii", $student_id, $subject_id);
-        $purchased_check->execute();
-        
-        if ($purchased_check->get_result()->num_rows > 0) {
-            $error = "You have already purchased this subject!";
-        } else {
-            // Add to cart (or update if already in cart)
-            $cart_stmt = $conn->prepare("INSERT INTO cart (student_id, subject_id, price) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE price = VALUES(price), added_at = CURRENT_TIMESTAMP");
-            $cart_stmt->bind_param("iid", $student_id, $subject_id, $subject['price']);
+        if ($is_logged_in) {
+            // Check if student already purchased this subject
+            $purchased_check = $conn->prepare("SELECT id FROM purchased_subjects WHERE student_id = ? AND subject_id = ? AND status = 'active'");
+            $purchased_check->bind_param("ii", $student_id, $subject_id);
+            $purchased_check->execute();
             
-            if ($cart_stmt->execute()) {
+            if ($purchased_check->get_result()->num_rows > 0) {
+                $error = "You have already purchased this subject!";
+            } else {
+                // Add to database cart for logged in users
+                $cart_stmt = $conn->prepare("INSERT INTO cart (student_id, subject_id, price) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE price = VALUES(price), added_at = CURRENT_TIMESTAMP");
+                $cart_stmt->bind_param("iid", $student_id, $subject_id, $subject['price']);
+                
+                if ($cart_stmt->execute()) {
+                    $success = "Subject added to cart successfully!";
+                } else {
+                    $error = "Error adding subject to cart.";
+                }
+            }
+        } else {
+            // Add to session cart for guest users
+            if (!isset($_SESSION['guest_cart'][$subject_id])) {
+                $_SESSION['guest_cart'][$subject_id] = [
+                    'subject_id' => $subject['id'],
+                    'code' => $subject['code'],
+                    'name' => $subject['name'],
+                    'price' => $subject['price'],
+                    'added_at' => date('Y-m-d H:i:s')
+                ];
                 $success = "Subject added to cart successfully!";
             } else {
-                $error = "Error adding subject to cart.";
+                $error = "This subject is already in your cart!";
             }
         }
     } else {
@@ -108,20 +129,28 @@ $subjects = $stmt->get_result();
 // Get departments for filter
 $departments = $conn->query("SELECT DISTINCT department FROM subjects WHERE is_active = 1 AND department IS NOT NULL ORDER BY department");
 
-// Get cart count for logged in user
+// Get cart count
 $cart_count = 0;
 if ($is_logged_in) {
     $cart_stmt = $conn->prepare("SELECT COUNT(*) as count FROM cart WHERE student_id = ?");
     $cart_stmt->bind_param("i", $student_id);
     $cart_stmt->execute();
     $cart_count = $cart_stmt->get_result()->fetch_assoc()['count'];
+} else {
+    $cart_count = count($_SESSION['guest_cart']);
 }
 
 $pageTitle = "Browse Exams";
+$isIndexPage = false;
 require_once('../includes/header.php');
 ?>
 
 <link rel="stylesheet" href="../moderator/css/moderator-style.css">
+
+<?php require_once('includes/sidebar.php'); ?>
+
+<div class="dashboard-layout">
+    <div class="main-content">
 
 <style>
 /* Additional styles for browse exams */
@@ -216,35 +245,43 @@ require_once('../includes/header.php');
     .subjects-grid {
         grid-template-columns: 1fr;
     }
+    
+    /* Mobile filter buttons - 2 buttons per row */
+    .dashboard-card .d-flex.gap-2 {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 0.5rem !important;
+    }
+    
+    /* Completely override btn-group behavior on mobile */
+    .dashboard-card .btn-group {
+        display: contents !important;
+    }
+    
+    .dashboard-card .btn-group .btn {
+        font-size: 0.75rem;
+        padding: 0.625rem 0.75rem;
+        white-space: nowrap;
+        width: calc(50% - 0.25rem) !important;
+        flex: 0 0 calc(50% - 0.25rem) !important;
+        border-radius: 0.375rem !important;
+        border: 1px solid !important;
+        margin: 0 !important;
+    }
+    
+    .dashboard-card > .d-flex > a.btn-primary {
+        font-size: 0.75rem;
+        padding: 0.625rem 0.75rem;
+        white-space: nowrap;
+        width: calc(50% - 0.25rem) !important;
+        flex: 0 0 calc(50% - 0.25rem) !important;
+        border-radius: 0.375rem !important;
+    }
 }
 </style>
 
 <div class="browse-exams-content">
     <!-- Page Header -->
-    <div class="page-header">
-        <div class="container">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h1><i class="fas fa-book-open"></i> Browse Available Exams</h1>
-                    <p>Explore our comprehensive collection of exam subjects and add them to your cart</p>
-                </div>
-                <div>
-                    <?php if ($is_logged_in): ?>
-                        <a href="cart.php" class="btn btn-primary">
-                            <i class="fas fa-shopping-cart"></i> Cart 
-                            <?php if ($cart_count > 0): ?>
-                                <span class="badge bg-secondary" style="background: white !important; color: var(--primary-color) !important; margin-left: 0.25rem;"><?= $cart_count ?></span>
-                            <?php endif; ?>
-                        </a>
-                    <?php else: ?>
-                        <a href="../auth/login.php" class="btn btn-primary">
-                            <i class="fas fa-sign-in-alt"></i> Login to Purchase
-                        </a>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <div class="container">
 
@@ -274,39 +311,30 @@ require_once('../includes/header.php');
         <?php endif; ?>
 
         <!-- Filters -->
-        <div class="dashboard-card">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="mb-0"><i class="fas fa-filter"></i> Filter Subjects</h5>
+        <div class="dashboard-card mt-2">
+            <div class="d-flex gap-2 w-100">
+                <div class="btn-group flex-grow-1" role="group">
+                    <a href="browse_exams.php" class="btn <?= $grade_filter === '' ? 'btn-primary' : 'btn-outline-primary' ?>">
+                        <i class="fas fa-list"></i> All Grades
+                    </a>
+                    <a href="browse_exams.php?grade=10th" class="btn <?= $grade_filter === '10th' ? 'btn-primary' : 'btn-outline-primary' ?>">
+                        <i class="fas fa-graduation-cap"></i> 10th Standard
+                    </a>
+                    <a href="browse_exams.php?grade=12th" class="btn <?= $grade_filter === '12th' ? 'btn-primary' : 'btn-outline-primary' ?>">
+                        <i class="fas fa-user-graduate"></i> 12th Standard
+                    </a>
+                </div>
+                <a href="cart.php" class="btn btn-primary">
+                    <i class="fas fa-shopping-cart"></i> Cart 
+                    <?php if ($cart_count > 0): ?>
+                        <span class="badge bg-light text-primary"><?= $cart_count ?></span>
+                    <?php endif; ?>
+                </a>
             </div>
-            <form method="GET" class="row g-3">
-                <div class="col-md-4">
-                    <label class="form-label">Grade Level</label>
-                    <select name="grade" class="form-select">
-                        <option value="">All Grades</option>
-                        <option value="10th" <?= $grade_filter === '10th' ? 'selected' : '' ?>>10th Standard</option>
-                        <option value="12th" <?= $grade_filter === '12th' ? 'selected' : '' ?>>12th Standard</option>
-                    </select>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">Search Subject</label>
-                    <input type="text" name="search" class="form-control" 
-                           value="<?= htmlspecialchars($search) ?>" 
-                           placeholder="Search by subject name or code...">
-                </div>
-                <div class="col-md-2 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="fas fa-filter"></i> Filter
-                    </button>
-                </div>
-            </form>
         </div>
 
         <!-- Subjects Grid -->
         <div class="dashboard-card">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="mb-0"><i class="fas fa-book-open"></i> Available Subjects</h5>
-            </div>
-            
             <?php if ($subjects->num_rows > 0): ?>
                 <div class="subjects-grid">
                     <?php while ($subject = $subjects->fetch_assoc()): ?>
@@ -335,15 +363,20 @@ require_once('../includes/header.php');
                                         <div class="subject-price">₹<?= number_format($subject['price'], 2) ?></div>
                                     </div>
 
-                                    <?php if (!$is_logged_in): ?>
-                                        <a href="../auth/login.php" class="btn btn-primary w-100">
-                                            <i class="fas fa-sign-in-alt"></i> Login to Purchase
-                                        </a>
-                                    <?php elseif ($subject['is_purchased']): ?>
+                                    <?php if ($is_logged_in && $subject['is_purchased']): ?>
                                         <button class="btn btn-outline-success w-100" disabled>
                                             <i class="fas fa-check"></i> Already Purchased
                                         </button>
-                                    <?php elseif ($subject['in_cart']): ?>
+                                    <?php elseif ($is_logged_in && $subject['in_cart']): ?>
+                                        <div class="d-flex gap-2">
+                                            <button class="btn btn-outline-secondary flex-grow-1" disabled>
+                                                <i class="fas fa-shopping-cart"></i> In Cart
+                                            </button>
+                                            <a href="cart.php" class="btn btn-primary">
+                                                <i class="fas fa-arrow-right"></i>
+                                            </a>
+                                        </div>
+                                    <?php elseif (!$is_logged_in && isset($_SESSION['guest_cart'][$subject['id']])): ?>
                                         <div class="d-flex gap-2">
                                             <button class="btn btn-outline-secondary flex-grow-1" disabled>
                                                 <i class="fas fa-shopping-cart"></i> In Cart
@@ -396,5 +429,8 @@ document.addEventListener('DOMContentLoaded', function() {
     <?php endif; ?>
 });
 </script>
+
+    </div>
+</div>
 
 <?php require_once('../includes/footer.php'); ?>

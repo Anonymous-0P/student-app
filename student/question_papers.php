@@ -91,10 +91,16 @@ $subjectsQuery .= " ORDER BY s.code";
 $subjects = $conn->query($subjectsQuery);
 
 $pageTitle = "Question Papers";
+$isIndexPage = false;
 require_once('../includes/header.php');
 ?>
 
 <link rel="stylesheet" href="../moderator/css/moderator-style.css">
+
+<?php require_once('includes/sidebar.php'); ?>
+
+<div class="dashboard-layout">
+    <div class="main-content">
 
 <style>
 /* Additional custom styles for question papers page */
@@ -312,11 +318,7 @@ require_once('../includes/header.php');
                     <h1><i class="fas fa-file-alt"></i> Question Papers</h1>
                     <p>View question papers for practice and preparation</p>
                 </div>
-                <div>
-                    <a href="dashboard.php" class="btn btn-outline-secondary">
-                        <i class="fas fa-arrow-left"></i> Back to Dashboard
-                    </a>
-                </div>
+                
             </div>
         </div>
     </div>
@@ -498,5 +500,8 @@ function showPurchaseModal(subjectCode, subjectName, subjectId, price) {
     modal.show();
 }
 </script>
+
+    </div>
+</div>
 
 <?php require_once('../includes/footer.php'); ?>

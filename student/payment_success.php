@@ -14,8 +14,11 @@ $payment_data = $_SESSION['payment_success'];
 unset($_SESSION['payment_success']); // Clear the session data
 
 $pageTitle = "Payment Successful";
+$isIndexPage = false;
 require_once('../includes/header.php');
 ?>
+
+<link rel="stylesheet" href="../moderator/css/moderator-style.css">
 
 <div class="container">
     <div class="row justify-content-center">
@@ -30,14 +33,13 @@ require_once('../includes/header.php');
             </div>
 
             <!-- Order Details Card -->
-            <div class="card shadow mb-4">
-                <div class="card-header bg-success text-white">
+            <div class="dashboard-card mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="mb-0">
                         <i class="fas fa-receipt me-2"></i>
                         Order Confirmation
                     </h5>
                 </div>
-                <div class="card-body">
                     <div class="row mb-4">
                         <div class="col-md-6">
                             <h6 class="text-muted">Payment ID</h6>
@@ -95,72 +97,29 @@ require_once('../includes/header.php');
                             </tfoot>
                         </table>
                     </div>
-                </div>
             </div>
 
-            <!-- What's Next -->
-            <div class="card shadow mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0">
-                        <i class="fas fa-arrow-right text-primary me-2"></i>
-                        What's Next?
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <div class="d-flex">
-                                <div class="flex-shrink-0">
-                                    <i class="fas fa-tachometer-alt fa-2x text-primary me-3"></i>
-                                </div>
-                                <div>
-                                    <h6>Access Your Dashboard</h6>
-                                    <p class="text-muted mb-0">Your purchased subjects are now available on your student dashboard with "Active" status.</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <div class="d-flex">
-                                <div class="flex-shrink-0">
-                                    <i class="fas fa-file-alt fa-2x text-primary me-3"></i>
-                                </div>
-                                <div>
-                                    <h6>Start Taking Exams</h6>
-                                    <p class="text-muted mb-0">Begin practicing with our comprehensive question banks and mock tests.</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <div class="d-flex">
-                                <div class="flex-shrink-0">
-                                    <i class="fas fa-chart-line fa-2x text-primary me-3"></i>
-                                </div>
-                                <div>
-                                    <h6>Track Progress</h6>
-                                    <p class="text-muted mb-0">Monitor your performance with detailed analytics and progress reports.</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <div class="d-flex">
-                                <div class="flex-shrink-0">
-                                    <i class="fas fa-envelope fa-2x text-primary me-3"></i>
-                                </div>
-                                <div>
-                                    <h6>Email Confirmation</h6>
-                                    <p class="text-muted mb-0">A confirmation email with your receipt has been sent to your registered email address.</p>
-                                </div>
-                            </div>
-                        </div>
+            <!-- Email Confirmation Notice -->
+            <?php if (isset($_SESSION['email_sent']) && $_SESSION['email_sent']): ?>
+            <div class="alert alert-success mb-4" role="alert">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-envelope-circle-check fa-2x me-3"></i>
+                    <div>
+                        <h6 class="alert-heading mb-1">Confirmation Email Sent!</h6>
+                        <p class="mb-0 small">A purchase confirmation email with your invoice has been sent to your registered email address.</p>
                     </div>
                 </div>
             </div>
+            <?php unset($_SESSION['email_sent']); endif; ?>
 
             <!-- Action Buttons -->
             <div class="text-center mb-4">
                 <div class="d-grid gap-2 d-md-block">
                     <a href="dashboard.php" class="btn btn-primary btn-lg me-2">
                         <i class="fas fa-tachometer-alt"></i> Go to Dashboard
+                    </a>
+                    <a href="view_invoice.php?payment_id=<?= urlencode($payment_data['payment_id']) ?>" class="btn btn-success btn-lg me-2" target="_blank">
+                        <i class="fas fa-file-invoice"></i> View Invoice
                     </a>
                     <a href="browse_exams.php" class="btn btn-outline-primary btn-lg">
                         <i class="fas fa-books"></i> Browse More Exams
@@ -169,19 +128,18 @@ require_once('../includes/header.php');
             </div>
 
             <!-- Additional Information -->
-            <div class="card bg-light border-0">
-                <div class="card-body">
-                    <h6 class="card-title">
-                        <i class="fas fa-info-circle text-info me-2"></i>
-                        Important Information
-                    </h6>
-                    <ul class="mb-0">
-                        <li><strong>Access Duration:</strong> Your access to each subject will expire after the specified duration period.</li>
-                        <li><strong>Receipt:</strong> Keep your payment ID for future reference and support queries.</li>
-                        <li><strong>Support:</strong> If you have any questions or issues, please contact our support team.</li>
-                        <li><strong>Refund Policy:</strong> Refunds are available within 7 days of purchase under certain conditions.</li>
-                    </ul>
-                </div>
+            <div class="dashboard-card" style="background: #f8f9fa;">
+                <h6 class="mb-3">
+                    <i class="fas fa-info-circle me-2" style="color: #0ea5e9;"></i>
+                    Important Information
+                </h6>
+                <ul class="mb-0">
+                    <li><strong>Email Confirmation:</strong> Check your email for the purchase confirmation and detailed invoice.</li>
+                    <li><strong>Access Duration:</strong> Your access to each subject will expire after the specified duration period.</li>
+                    <li><strong>Receipt:</strong> Keep your payment ID for future reference and support queries.</li>
+                    <li><strong>Support:</strong> If you have any questions or issues, please contact our support team.</li>
+                    <li><strong>Refund Policy:</strong> Refunds are available within 7 days of purchase under certain conditions.</li>
+                </ul>
             </div>
         </div>
     </div>
