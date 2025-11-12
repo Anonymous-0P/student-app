@@ -223,10 +223,6 @@ if (isset($_SESSION['user_id'])) {
                 <i class="fas fa-file-alt icon"></i>
                 <span>My Submissions</span>
             </a>
-            <a href="evaluation_results.php" class="sidebar-item <?= $currentPage == 'evaluation_results.php' ? 'active' : '' ?>">
-                <i class="fas fa-chart-line icon"></i>
-                <span>Results</span>
-            </a>
         </div>
 
         <div class="sidebar-section">

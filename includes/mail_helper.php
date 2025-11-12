@@ -715,9 +715,9 @@ function generateInvoicePDF($paymentId, $userInfo, $items, $total, $billingInfo)
  * @param int $submissionId Submission ID
  * @return array Result of email sending
  */
-function sendEvaluationCompleteEmail($email, $name, $subjectCode, $subjectName, $marksObtained, $maxMarks, $percentage, $grade, $remarks, $submissionId) {
+function sendEvaluationAcceptedEmail($email, $name, $subjectCode, $subjectName, $submissionId) {
     $subject = "✅ Answer Sheet Accepted for Evaluation - " . $subjectCode . " | ThetaExams";
-    
+
     $body = "
     <html>
     <head>
@@ -732,7 +732,6 @@ function sendEvaluationCompleteEmail($email, $name, $subjectCode, $subjectName, 
             .info-row:last-child { border-bottom: none; }
             .info-label { color: #6b7280; font-weight: 500; }
             .info-value { color: #1f2937; font-weight: 600; }
-            .highlight-box { background: #e0e7ff; border-left: 4px solid #667eea; padding: 20px; margin: 20px 0; border-radius: 4px; }
             .icon-badge { display: inline-block; width: 80px; height: 80px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-size: 40px; line-height: 80px; text-align: center; border-radius: 50%; margin: 20px auto; }
         </style>
     </head>
@@ -744,52 +743,19 @@ function sendEvaluationCompleteEmail($email, $name, $subjectCode, $subjectName, 
             </div>
             <div class='content'>
                 <h2 style='color: #667eea;'>Hello " . htmlspecialchars($name) . ",</h2>
-                
                 <div style='text-align: center; margin: 30px 0;'>
                     <div class='icon-badge'>✓</div>
                 </div>
-                
-                <p style='font-size: 16px; text-align: center;'>Great news! Your answer sheet for <strong>" . htmlspecialchars($subjectName) . " (" . htmlspecialchars($subjectCode) . ")</strong> has been accepted and processed by our evaluator. 🎓</p>
-                
+                <p style='font-size: 16px; text-align: center;'>Great news! Your answer sheet for <strong>" . htmlspecialchars($subjectName) . " (" . htmlspecialchars($subjectCode) . ")</strong> has been accepted by our evaluator.</p>
                 <div class='info-card'>
-                    <h3 style='color: #667eea; margin-top: 0;'>� Submission Details</h3>
-                    <div class='info-row'>
-                        <span class='info-label'>Subject:</span>
-                        <span class='info-value'>" . htmlspecialchars($subjectName) . "</span>
-                    </div>
-                    <div class='info-row'>
-                        <span class='info-label'>Subject Code:</span>
-                        <span class='info-value'>" . htmlspecialchars($subjectCode) . "</span>
-                    </div>
-                    <div class='info-row'>
-                        <span class='info-label'>Status:</span>
-                        <span class='info-value' style='color: #10b981;'>✓ Evaluation Complete</span>
-                    </div>
-                    <div class='info-row'>
-                        <span class='info-label'>Date:</span>
-                        <span class='info-value'>" . date('d M Y, h:i A') . "</span>
-                    </div>
+                    <div class='info-row'><span class='info-label'>Subject:</span><span class='info-value'>" . htmlspecialchars($subjectName) . "</span></div>
+                    <div class='info-row'><span class='info-label'>Code:</span><span class='info-value'>" . htmlspecialchars($subjectCode) . "</span></div>
+                    <div class='info-row'><span class='info-label'>Status:</span><span class='info-value' style='color:#10b981;'>Under Evaluation</span></div>
+                    <div class='info-row'><span class='info-label'>Date:</span><span class='info-value'>" . date('d M Y, h:i A') . "</span></div>
                 </div>
-                
-                <div class='highlight-box'>
-                    <strong style='color: #667eea; font-size: 16px;'>📝 What's Next?</strong>
-                    <ul style='margin: 10px 0 0 0; padding-left: 20px;'>
-                        <li>Login to your dashboard to view the evaluation results</li>
-                        <li>Check your marks and detailed feedback from the evaluator</li>
-                        <li>Review areas of improvement</li>
-                        <li>Continue practicing to enhance your performance</li>
-                    </ul>
-                </div>
-                
-                <p style='text-align: center; margin-top: 30px;'>
-                    <a href='http://localhost/student-app/student/dashboard.php' class='button'>� View Dashboard</a>
+                <p style='text-align: center;'>
+                    <a href='http://localhost/student-app/student/dashboard.php' class='button'>📊 View Dashboard</a>
                 </p>
-                
-                <div style='margin-top: 30px; padding: 20px; background: white; border-radius: 8px; border: 1px solid #e5e7eb;'>
-                    <h4 style='color: #667eea; margin-top: 0;'>💡 Need Help?</h4>
-                    <p style='margin: 0;'>If you have any questions about your evaluation, please contact our support team. We're here to help you succeed!</p>
-                </div>
-                
                 <p style='margin-top: 30px;'>Best regards,<br><strong>The ThetaExams Team</strong></p>
             </div>
             <div style='text-align: center; margin-top: 30px; color: #666; font-size: 12px;'>
@@ -800,6 +766,124 @@ function sendEvaluationCompleteEmail($email, $name, $subjectCode, $subjectName, 
     </body>
     </html>
     ";
-    
+
     return sendEmail($email, $subject, $body, $name);
+}
+
+/**
+ * Send evaluation completed notification email (no marks shown)
+ */
+function sendEvaluationCompletedEmail($email, $name, $subjectCode, $subjectName, $resultUrl = 'http://localhost/student-app/student/dashboard.php') {
+    $subject = "✅ Evaluation Completed - " . $subjectCode . " | ThetaExams";
+
+    $body = "
+    <html>
+    <head>
+        <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 650px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
+            .button { display: inline-block; padding: 14px 35px; background: #10b981; color: white; text-decoration: none; border-radius: 8px; margin: 20px 0; font-weight: 600; }
+            .info-card { background: white; border: 2px solid #e5e7eb; border-radius: 12px; padding: 25px; margin: 20px 0; }
+            .info-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #e5e7eb; }
+            .info-row:last-child { border-bottom: none; }
+            .info-label { color: #6b7280; font-weight: 500; }
+            .info-value { color: #1f2937; font-weight: 600; }
+        </style>
+    </head>
+    <body>
+        <div class='container'>
+            <div class='header'>
+                <h1 style='margin:0;font-size:28px;'>✅ Evaluation Completed</h1>
+                <p style='margin:10px 0 0 0;opacity:.9;font-size:16px;'>Your results are ready to view</p>
+            </div>
+            <div class='content'>
+                <h2 style='color:#059669;'>Hello " . htmlspecialchars($name) . ",</h2>
+                <p>Your answer sheet for <strong>" . htmlspecialchars($subjectName) . " (" . htmlspecialchars($subjectCode) . ")</strong> has been evaluated. Please log in to view your marks and feedback.</p>
+                <div class='info-card'>
+                    <div class='info-row'><span class='info-label'>Subject:</span><span class='info-value'>" . htmlspecialchars($subjectName) . "</span></div>
+                    <div class='info-row'><span class='info-label'>Code:</span><span class='info-value'>" . htmlspecialchars($subjectCode) . "</span></div>
+                    <div class='info-row'><span class='info-label'>Status:</span><span class='info-value' style='color:#10b981;'>Completed</span></div>
+                    <div class='info-row'><span class='info-label'>Date:</span><span class='info-value'>" . date('d M Y, h:i A') . "</span></div>
+                </div>
+                <p style='text-align:center;'>
+                    <a href='" . $resultUrl . "' class='button'>📖 View Results</a>
+                </p>
+                <p style='margin-top:30px;'>Best regards,<br><strong>The ThetaExams Team</strong></p>
+            </div>
+            <div style='text-align:center;margin-top:30px;color:#666;font-size:12px;'>
+                <p>This is an automated notification email.</p>
+                <p>&copy; " . date('Y') . " ThetaExams. All rights reserved.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    ";
+
+    return sendEmail($email, $subject, $body, $name);
+}
+
+/**
+ * Send submission received confirmation email
+ */
+function sendSubmissionReceivedEmail($email, $name, $subjectCode, $subjectName, $statusUrl = 'http://localhost/student-app/student/dashboard.php') {
+    $subject = "📤 Answer Sheet Submitted - " . $subjectCode . " | ThetaExams";
+
+    // Ensure href is always a non-empty string
+    $statusHref = $statusUrl ? $statusUrl : 'http://localhost/student-app/student/dashboard.php';
+
+    $body = "
+    <html>
+    <head>
+        <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 650px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
+            .button { display: inline-block; padding: 14px 35px; background: #3b82f6; color: white; text-decoration: none; border-radius: 8px; margin: 20px 0; font-weight: 600; }
+            .info-card { background: white; border: 2px solid #e5e7eb; border-radius: 12px; padding: 25px; margin: 20px 0; }
+            .info-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #e5e7eb; }
+            .info-row:last-child { border-bottom: none; }
+            .info-label { color: #6b7280; font-weight: 500; }
+            .info-value { color: #1f2937; font-weight: 600; }
+        </style>
+    </head>
+    <body>
+        <div class='container'>
+            <div class='header'>
+                <h1 style='margin:0;font-size:28px;'>📤 Submission Received</h1>
+                <p style='margin:10px 0 0 0;opacity:.9;font-size:16px;'>We've received your answer sheet</p>
+            </div>
+            <div class='content'>
+                <h2 style='color:#3b82f6;'>Hello " . htmlspecialchars($name) . ",</h2>
+                <p>Your answer sheet for <strong>" . htmlspecialchars($subjectName) . " (" . htmlspecialchars($subjectCode) . ")</strong> has been submitted successfully. You'll be notified when an evaluator accepts it.</p>
+                <div class='info-card'>
+                    <div class='info-row'><span class='info-label'>Subject:</span><span class='info-value'>" . htmlspecialchars($subjectName) . "</span></div>
+                    <div class='info-row'><span class='info-label'>Code:</span><span class='info-value'>" . htmlspecialchars($subjectCode) . "</span></div>
+                    <div class='info-row'><span class='info-label'>Status:</span><span class='info-value' style='color:#6366f1;'>Submitted</span></div>
+                    <div class='info-row'><span class='info-label'>Date:</span><span class='info-value'>" . date('d M Y, h:i A') . "</span></div>
+                </div>
+                <p style='text-align:center;'>
+                    <a href='" . $statusHref . "' class='button'>🧭 Track Status</a>
+                </p>
+                <p style='margin-top:30px;'>Best regards,<br><strong>The ThetaExams Team</strong></p>
+            </div>
+            <div style='text-align:center;margin-top:30px;color:#666;font-size:12px;'>
+                <p>This is an automated notification email.</p>
+                <p>&copy; " . date('Y') . " ThetaExams. All rights reserved.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    ";
+
+    return sendEmail($email, $subject, $body, $name);
+}
+
+// Backward compatibility: keep legacy name as alias to completed notification
+if (!function_exists('sendEvaluationCompleteEmail')) {
+    function sendEvaluationCompleteEmail($email, $name, $subjectCode, $subjectName, $marksObtained, $maxMarks, $percentage, $grade, $remarks, $submissionId) {
+        return sendEvaluationCompletedEmail($email, $name, $subjectCode, $subjectName, 'http://localhost/student-app/student/dashboard.php');
+    }
 }

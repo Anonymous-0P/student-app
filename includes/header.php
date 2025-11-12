@@ -422,11 +422,11 @@ $isAuthPage = strpos($currentPath, '/auth/') !== false;
             $isPaymentSuccessPage = strpos($_SERVER['REQUEST_URI'], 'payment_success.php') !== false;
             if (!empty($currentUserRole) && $currentUserRole !== 'student' && !$isPaymentSuccessPage): 
             ?>
-            <button class="hamburger-btn ms-3" type="button" data-bs-toggle="offcanvas" data-bs-target="#roleMenuOffcanvas" aria-controls="roleMenuOffcanvas">
+            <!-- <button class="hamburger-btn ms-3" type="button" data-bs-toggle="offcanvas" data-bs-target="#roleMenuOffcanvas" aria-controls="roleMenuOffcanvas">
                 <span class="hamburger-line"></span>
                 <span class="hamburger-line"></span>
                 <span class="hamburger-line"></span>
-            </button>
+            </button> -->
             <?php endif; ?>
         </div>
     </div>

@@ -79,6 +79,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             
             $student_notif_stmt = $pdo->prepare($student_notification_sql);
             $student_notif_stmt->execute([$assignment['answer_sheet_id']]);
+
+            // Send acceptance email to student (no marks)
+            try {
+                $details_sql = "SELECT u.name AS student_name, u.email AS student_email, s.name AS subject_name, s.code AS subject_code
+                                FROM answer_sheets as_main
+                                JOIN users u ON as_main.student_id = u.id
+                                JOIN subjects s ON as_main.subject_id = s.id
+                                WHERE as_main.id = ?";
+                $details_stmt = $pdo->prepare($details_sql);
+                $details_stmt->execute([$assignment['answer_sheet_id']]);
+                $details = $details_stmt->fetch(PDO::FETCH_ASSOC);
+                if ($details) {
+                    require_once('../includes/mail_helper.php');
+                    $emailResult = sendEvaluationAcceptedEmail(
+                        $details['student_email'],
+                        $details['student_name'],
+                        $details['subject_code'],
+                        $details['subject_name'],
+                        $assignment['answer_sheet_id']
+                    );
+                    if (!$emailResult['success']) {
+                        error_log('Failed to send acceptance email (answer_sheets flow): ' . $emailResult['message']);
+                    }
+                }
+            } catch (Exception $e) {
+                error_log('Error sending acceptance email (answer_sheets flow): ' . $e->getMessage());
+            }
             
             $pdo->commit();
             

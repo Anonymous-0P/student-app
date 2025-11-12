@@ -7,11 +7,11 @@
 // SMTP Configuration - Hostinger
 define('MAIL_HOST', 'smtp.hostinger.com');          // Hostinger SMTP server
 define('MAIL_PORT', 465);                           // SMTP port (587 for TLS, 465 for SSL)
-define('MAIL_USERNAME', 'mail@mail.com'); // Your Hostinger email address
-define('MAIL_PASSWORD', 'password');     // Your Hostinger email password
+define('MAIL_USERNAME', 'copilot@thetadynamics.in'); // Your Hostinger email address
+define('MAIL_PASSWORD', 'B_29bomber');     // Your Hostinger email password
 define('MAIL_ENCRYPTION', 'ssl');                   // Encryption type: 'tls' or 'ssl'
-define('MAIL_FROM_ADDRESS', 'mail'); // From email address (MUST match MAIL_USERNAME)
-define('MAIL_FROM_NAME', 'ThetaExams');             // From name
+define('MAIL_FROM_ADDRESS', 'copilot@thetadynamics.in'); // From email address (MUST match MAIL_USERNAME)
+define('MAIL_FROM_NAME', 'ThetaExams');              // From name
 
 // Email Settings
 define('MAIL_DEBUG', 0);                            // Debug level: 0 = off, 1 = client, 2 = server

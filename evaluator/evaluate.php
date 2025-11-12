@@ -76,7 +76,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_evaluation']))
             
             // Process per-question marks if provided
             $question_marks = isset($_POST['question_marks']) ? $_POST['question_marks'] : [];
+            // Debug log for question marks
+            error_log('EVALUATOR SUBMIT: question_marks=' . print_r($question_marks, true));
             $per_question_marks_json = json_encode($question_marks);
+            error_log('EVALUATOR SUBMIT: per_question_marks_json=' . $per_question_marks_json);
             
             // Handle annotated PDF file upload
             $annotated_pdf_path = null;
@@ -202,9 +205,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_evaluation']))
                 $additional_update_query = "UPDATE submissions SET 
                     per_question_marks = ?,
                     percentage = ?,
-                    grade = ?
+                    grade = ?,
+                    is_published = 0
                     WHERE id = ?";
-                
                 $stmt2 = $conn->prepare($additional_update_query);
                 if ($stmt2) {
                     $stmt2->bind_param("sdsi", $per_question_marks_json, $percentage, $grade, $submission_id);
@@ -295,19 +298,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_evaluation']))
             
             $conn->commit();
             
-            // Send evaluation completion email to student
+            // Send evaluation completion email to student (no marks shown)
             require_once('../includes/mail_helper.php');
-            $emailResult = sendEvaluationCompleteEmail(
+            $emailResult = sendEvaluationCompletedEmail(
                 $submission['student_email'],
                 $submission['student_name'],
                 $submission['subject_code'],
-                $submission['subject_name'],
-                $marks_obtained,
-                $max_marks,
-                $percentage,
-                $grade,
-                $evaluator_remarks,
-                $submission_id
+                $submission['subject_name']
             );
             
             // Store email status (optional - for debugging)
@@ -489,12 +486,25 @@ $pageTitle = "Evaluate Submission";
             padding: 0.25rem 0.25rem;
             font-size: 0.8125rem;
             flex-shrink: 0;
+            transition: all 0.2s ease;
         }
         
         .question-input-group .form-control:focus {
             outline: none;
             border-color: var(--primary-color);
             box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+        
+        .question-input-group .form-control.highlight-required {
+            border-color: #dc3545;
+            background-color: #fff5f5;
+            animation: shake 0.5s;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
         }
         
         .question-label {
@@ -677,7 +687,12 @@ $pageTitle = "Evaluate Submission";
                                 <div class="marks-breakdown">
                                     <h6 class="mb-3">
                                         <i class="fas fa-calculator me-2"></i>Marks Allocation
+                                        <span class="badge bg-danger ms-2" style="font-size: 0.65rem;">Required *</span>
                                     </h6>
+                                    <div class="alert alert-warning py-2 px-3 mb-3" style="font-size: 0.75rem;">
+                                        <i class="fas fa-exclamation-triangle me-1"></i>
+                                        <strong>Fill marks for each question.</strong> Total will be calculated automatically.
+                                    </div>
 
                                     <?php
                                     // Division-based question template
@@ -1188,6 +1203,43 @@ $pageTitle = "Evaluate Submission";
             const marksObtained = parseFloat(document.getElementById('marks_obtained').value);
             const maxMarks = parseFloat(document.getElementById('max_marks').value);
             const remarks = document.getElementById('evaluator_remarks').value.trim();
+            
+            // Check if at least one question mark is filled
+            const questionMarks = document.querySelectorAll('.per-question-mark');
+            let hasQuestionMarks = false;
+            let totalQuestionMarks = 0;
+            
+            questionMarks.forEach(function(input) {
+                const value = parseFloat(input.value) || 0;
+                if (value > 0) {
+                    hasQuestionMarks = true;
+                }
+                totalQuestionMarks += value;
+            });
+            
+            if (!hasQuestionMarks || totalQuestionMarks === 0) {
+                e.preventDefault();
+                
+                // Add visual highlight to all question inputs
+                questionMarks.forEach(function(input) {
+                    input.classList.add('highlight-required');
+                });
+                
+                // Remove highlight after animation
+                setTimeout(function() {
+                    questionMarks.forEach(function(input) {
+                        input.classList.remove('highlight-required');
+                    });
+                }, 1500);
+                
+                alert('⚠️ Question-wise marks are mandatory!\n\nPlease fill in the marks for each question before submitting.\nThe total marks will be calculated automatically.');
+                // Scroll to first question input
+                if (questionMarks.length > 0) {
+                    questionMarks[0].focus();
+                    questionMarks[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                return;
+            }
             
             if (isNaN(marksObtained) || marksObtained < 0) {
                 e.preventDefault();

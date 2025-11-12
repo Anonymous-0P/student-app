@@ -165,16 +165,11 @@ try {
             
             if ($studentInfo && $subjectInfo) {
                 require_once('../includes/mail_helper.php');
-                $emailResult = sendEvaluationCompleteEmail(
+                $emailResult = sendEvaluationAcceptedEmail(
                     $studentInfo['email'],
                     $studentInfo['name'],
                     $subject_code,
                     $subjectInfo['name'],
-                    0, // marks not yet evaluated
-                    0, // max marks not yet evaluated
-                    0, // percentage not yet evaluated
-                    '', // grade not yet evaluated
-                    '', // remarks not yet evaluated
                     $submission_id
                 );
                 

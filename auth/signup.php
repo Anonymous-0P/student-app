@@ -89,7 +89,7 @@ if(isset($_POST['signup'])){
                     <input type="text" name="college_name" class="form-control" placeholder="XYZ University" required value="<?= isset($_POST['college_name']) ? htmlspecialchars($_POST['college_name']) : '' ?>">
                 </div>
                 <div class="col-12">
-                    <label class="form-label">Division <span class="text-danger">*</span></label>
+                    <label class="form-label">Grade <span class="text-danger">*</span></label>
                     <select name="division" class="form-select" required>
                         <option value="">Select Division</option>
                         <option value="10th" <?= (isset($_POST['division']) && $_POST['division'] == '10th') ? 'selected' : '' ?>>10th Standard (State Board)</option>

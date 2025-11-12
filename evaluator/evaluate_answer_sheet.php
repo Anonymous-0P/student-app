@@ -156,6 +156,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 "Evaluation completed and published successfully!" : 
                 "Evaluation saved successfully!";
             $_SESSION['success'] = $success_message;
+
+            // If published, notify student via email (no marks in email)
+            if (isset($_POST['publish'])) {
+                try {
+                    require_once('../includes/mail_helper.php');
+                    $emailResult = sendEvaluationCompletedEmail(
+                        $assignment['student_email'],
+                        $assignment['student_name'],
+                        $assignment['subject_code'],
+                        $assignment['subject_name'],
+                        'http://localhost/student-app/student/evaluation_results.php?id=' . $answer_sheet_id
+                    );
+                    if (!$emailResult['success']) {
+                        error_log('Failed to send evaluation completed email (answer_sheets flow): ' . $emailResult['message']);
+                    }
+                } catch (Exception $e) {
+                    error_log('Error sending evaluation completed email (answer_sheets flow): ' . $e->getMessage());
+                }
+            }
             
         }
     } catch (Exception $e) {

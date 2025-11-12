@@ -105,7 +105,6 @@ if(isset($_POST['create_moderator'])) {
         $name = trim($_POST['name']);
         $email = trim($_POST['email']);
         $password = password_hash($_POST['password'], PASSWORD_BCRYPT);
-        $department = !empty($_POST['department']) ? trim($_POST['department']) : null;
         $phone = !empty($_POST['phone']) ? trim($_POST['phone']) : null;
         
         // Check if email already exists
@@ -125,23 +124,23 @@ if(isset($_POST['create_moderator'])) {
             $has_is_active = $is_active_check && $is_active_check->num_rows > 0;
             
             if($has_phone && $has_is_active) {
-                $stmt = $conn->prepare("INSERT INTO users (name, email, password, role, department, phone, is_active, created_at) VALUES (?, ?, ?, 'moderator', ?, ?, 1, NOW())");
+                $stmt = $conn->prepare("INSERT INTO users (name, email, password, role, phone, is_active, created_at) VALUES (?, ?, ?, 'moderator', ?, 1, NOW())");
                 if($stmt) {
-                    $stmt->bind_param("sssss", $name, $email, $password, $department, $phone);
+                    $stmt->bind_param("ssss", $name, $email, $password, $phone);
                 } else {
                     $error = "Database error: " . $conn->error;
                 }
             } else if($has_phone) {
-                $stmt = $conn->prepare("INSERT INTO users (name, email, password, role, department, phone, created_at) VALUES (?, ?, ?, 'moderator', ?, ?, NOW())");
+                $stmt = $conn->prepare("INSERT INTO users (name, email, password, role, phone, created_at) VALUES (?, ?, ?, 'moderator', ?, NOW())");
                 if($stmt) {
-                    $stmt->bind_param("sssss", $name, $email, $password, $department, $phone);
+                    $stmt->bind_param("ssss", $name, $email, $password, $phone);
                 } else {
                     $error = "Database error: " . $conn->error;
                 }
             } else {
-                $stmt = $conn->prepare("INSERT INTO users (name, email, password, role, department, created_at) VALUES (?, ?, ?, 'moderator', ?, NOW())");
+                $stmt = $conn->prepare("INSERT INTO users (name, email, password, role, created_at) VALUES (?, ?, ?, 'moderator', NOW())");
                 if($stmt) {
-                    $stmt->bind_param("ssss", $name, $email, $password, $department);
+                    $stmt->bind_param("sss", $name, $email, $password);
                 } else {
                     $error = "Database error: " . $conn->error;
                 }
@@ -192,7 +191,6 @@ if(isset($_POST['update_moderator'])) {
         $user_id = (int)$_POST['user_id'];
         $name = trim($_POST['name']);
         $email = trim($_POST['email']);
-        $department = !empty($_POST['department']) ? trim($_POST['department']) : null;
         $phone = !empty($_POST['phone']) ? trim($_POST['phone']) : null;
         
         // Check if email already exists (excluding current user)
@@ -209,16 +207,16 @@ if(isset($_POST['update_moderator'])) {
             $has_phone = $columns_check && $columns_check->num_rows > 0;
             
             if($has_phone) {
-                $stmt = $conn->prepare("UPDATE users SET name=?, email=?, department=?, phone=? WHERE id=? AND role='moderator'");
+                $stmt = $conn->prepare("UPDATE users SET name=?, email=?, phone=? WHERE id=? AND role='moderator'");
                 if($stmt) {
-                    $stmt->bind_param("ssssi", $name, $email, $department, $phone, $user_id);
+                    $stmt->bind_param("sssi", $name, $email, $phone, $user_id);
                 } else {
                     $error = "Database error: " . $conn->error;
                 }
             } else {
-                $stmt = $conn->prepare("UPDATE users SET name=?, email=?, department=? WHERE id=? AND role='moderator'");
+                $stmt = $conn->prepare("UPDATE users SET name=?, email=? WHERE id=? AND role='moderator'");
                 if($stmt) {
-                    $stmt->bind_param("sssi", $name, $email, $department, $user_id);
+                    $stmt->bind_param("ssi", $name, $email, $user_id);
                 } else {
                     $error = "Database error: " . $conn->error;
                 }
@@ -377,7 +375,6 @@ if(isset($_POST['toggle_status'])) {
 // Filter and search parameters
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $status_filter = isset($_GET['status']) ? $_GET['status'] : '';
-$department_filter = isset($_GET['department']) ? $_GET['department'] : '';
 
 // Build query for moderators only
 // Check if moderator_subjects table exists
@@ -401,24 +398,17 @@ $params = [];
 $types = "";
 
 if(!empty($search)) {
-    $query .= " AND (u.name LIKE ? OR u.email LIKE ? OR u.department LIKE ?)";
+    $query .= " AND (u.name LIKE ? OR u.email LIKE ?)";
     $search_param = "%$search%";
     $params[] = $search_param;
     $params[] = $search_param;
-    $params[] = $search_param;
-    $types .= "sss";
+    $types .= "ss";
 }
 
 if($status_filter !== '') {
     $query .= " AND u.is_active = ?";
     $params[] = (int)$status_filter;
     $types .= "i";
-}
-
-if(!empty($department_filter)) {
-    $query .= " AND u.department = ?";
-    $params[] = $department_filter;
-    $types .= "s";
 }
 
 $query .= " ORDER BY u.name ASC";
@@ -447,20 +437,15 @@ if($is_active_check && $is_active_check->num_rows > 0) {
     $moderatorStats = $conn->query("SELECT 
         COUNT(*) as total_moderators,
         SUM(is_active) as active_moderators,
-        COUNT(DISTINCT department) as total_departments,
         (SELECT COUNT(*) FROM users WHERE role IN ('student', 'evaluator') AND moderator_id IS NOT NULL) as total_assigned_users
         FROM users WHERE role = 'moderator'")->fetch_assoc();
 } else {
     $moderatorStats = $conn->query("SELECT 
         COUNT(*) as total_moderators,
         COUNT(*) as active_moderators,
-        COUNT(DISTINCT department) as total_departments,
         (SELECT COUNT(*) FROM users WHERE role IN ('student', 'evaluator') AND moderator_id IS NOT NULL) as total_assigned_users
         FROM users WHERE role = 'moderator'")->fetch_assoc();
 }
-
-// Get departments for filter
-$departments = $conn->query("SELECT DISTINCT department FROM users WHERE role = 'moderator' AND department IS NOT NULL ORDER BY department");
 ?>
 
 <link rel="stylesheet" href="../moderator/css/moderator-style.css">
@@ -626,7 +611,7 @@ $departments = $conn->query("SELECT DISTINCT department FROM users WHERE role = 
 
     <!-- Moderator Statistics -->
     <div class="row g-4 mb-4 fade-in">
-        <div class="col-md-3">
+        <div class="col-md-4">
             <div class="stat-box">
                 <div class="stat-icon" style="background-color: rgba(16, 185, 129, 0.1); color: #10b981;">
                     <i class="fas fa-user-check"></i>
@@ -637,18 +622,7 @@ $departments = $conn->query("SELECT DISTINCT department FROM users WHERE role = 
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="stat-box">
-                <div class="stat-icon" style="background-color: rgba(37, 99, 235, 0.1); color: #2563eb;">
-                    <i class="fas fa-building"></i>
-                </div>
-                <div class="stat-details">
-                    <div class="stat-value"><?= $moderatorStats['total_departments'] ?></div>
-                    <div class="stat-label">Departments</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
+        <div class="col-md-4">
             <div class="stat-box">
                 <div class="stat-icon" style="background-color: rgba(245, 158, 11, 0.1); color: #f59e0b;">
                     <i class="fas fa-users"></i>
@@ -659,7 +633,7 @@ $departments = $conn->query("SELECT DISTINCT department FROM users WHERE role = 
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-4">
             <div class="stat-box">
                 <div class="stat-icon" style="background-color: rgba(239, 68, 68, 0.1); color: #ef4444;">
                     <i class="fas fa-user-times"></i>
@@ -677,29 +651,17 @@ $departments = $conn->query("SELECT DISTINCT department FROM users WHERE role = 
         <div class="col-12">
             <div class="search-filters">
                 <form method="GET" class="row g-3">
-                    <div class="col-md-4">
+                    <div class="col-md-6">
                         <label class="form-label">Search Moderators</label>
                         <input type="text" class="form-control" name="search" value="<?= htmlspecialchars($search) ?>" 
-                               placeholder="Name, email, or department...">
+                               placeholder="Name or email...">
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-3">
                         <label class="form-label">Status</label>
                         <select name="status" class="form-select">
                             <option value="">All Status</option>
                             <option value="1" <?= $status_filter === '1' ? 'selected' : '' ?>>Active</option>
                             <option value="0" <?= $status_filter === '0' ? 'selected' : '' ?>>Inactive</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">Department</label>
-                        <select name="department" class="form-select">
-                            <option value="">All Departments</option>
-                            <?php while($dept = $departments->fetch_assoc()): ?>
-                                <option value="<?= htmlspecialchars($dept['department']) ?>" 
-                                        <?= $department_filter === $dept['department'] ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($dept['department']) ?>
-                                </option>
-                            <?php endwhile; ?>
                         </select>
                     </div>
                     <div class="col-md-3 d-flex align-items-end gap-2">
@@ -732,7 +694,6 @@ $departments = $conn->query("SELECT DISTINCT department FROM users WHERE role = 
                             <thead class="table-light">
                                 <tr>
                                     <th>Moderator Info</th>
-                                    <th>Department</th>
                                     <th>Assignments</th>
                                     <th>Contact</th>
                                     <th>Status</th>
@@ -745,13 +706,6 @@ $departments = $conn->query("SELECT DISTINCT department FROM users WHERE role = 
                                     <td>
                                         <div class="fw-semibold"><?= htmlspecialchars($moderator['name']) ?></div>
                                         <small class="text-muted"><?= htmlspecialchars($moderator['email']) ?></small>
-                                    </td>
-                                    <td>
-                                        <?php if($moderator['department']): ?>
-                                            <span class="badge bg-info"><?= htmlspecialchars($moderator['department']) ?></span>
-                                        <?php else: ?>
-                                            <span class="text-muted">Not assigned</span>
-                                        <?php endif; ?>
                                     </td>
                                     <td>
                                         <div>
@@ -838,12 +792,7 @@ $departments = $conn->query("SELECT DISTINCT department FROM users WHERE role = 
                             <label for="email" class="form-label">Email Address *</label>
                             <input type="email" class="form-control" name="email" id="email" required>
                         </div>
-                        <div class="col-md-6">
-                            <label for="department" class="form-label">Department</label>
-                            <input type="text" class="form-control" name="department" id="department" 
-                                   placeholder="e.g., Computer Science">
-                        </div>
-                        <div class="col-md-6">
+                        <div class="col-md-12">
                             <label for="phone" class="form-label">Phone Number</label>
                             <input type="text" class="form-control" name="phone" id="phone" 
                                    placeholder="e.g., +1234567890">
@@ -993,7 +942,6 @@ function editModerator(userId) {
             document.getElementById('user_id').value = data.id;
             document.getElementById('name').value = data.name || '';
             document.getElementById('email').value = data.email || '';
-            document.getElementById('department').value = data.department || '';
             document.getElementById('phone').value = data.phone || '';
             
             // Set assigned subjects
