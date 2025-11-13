@@ -279,6 +279,75 @@ body {
                 <span class="status-badge bg-success text-white">
                     <i class="fas fa-check-circle me-1"></i>Evaluated
                 </span>
+
+                <?php
+                // Decode per-question marks if present
+                $per_question = [];
+                if (!empty($submission['per_question_marks'])) {
+                    $decoded = json_decode($submission['per_question_marks'], true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                        $per_question = $decoded;
+                    }
+                }
+                // Determine if we should show editable question-wise marks
+                $show_question_editor = !empty($per_question);
+                ?>
+            </div>
+            
+            <!-- Question-wise Marks (Editable) -->
+            <div class="info-card">
+                <h6 class="text-secondary mb-3"><i class="fas fa-list-ol me-2"></i>Question-wise Marks</h6>
+                <?php if ($show_question_editor): ?>
+                <form id="questionMarksForm">
+                    <input type="hidden" name="submission_id" value="<?= (int)$submission_id ?>">
+                    <div class="table-responsive" style="max-height:380px; overflow-y:auto;">
+                        <table class="table table-sm align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width:70px;">Q#</th>
+                                    <th style="width:140px;">Marks (Obtained)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php
+                                $total_from_questions = 0;
+                                foreach ($per_question as $qnum => $qmark):
+                                    $safe_qnum = (int)$qnum;
+                                    $safe_qmark = is_numeric($qmark) ? floatval($qmark) : 0;
+                                    $total_from_questions += $safe_qmark;
+                                ?>
+                                <tr>
+                                    <td><strong>Q<?= $safe_qnum ?></strong></td>
+                                    <td>
+                                        <input type="number" min="0" step="0.25" class="form-control form-control-sm q-mark-input" name="q[<?= $safe_qnum ?>]" value="<?= number_format($safe_qmark,2) ?>" style="max-width:100px;">
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="alert alert-info py-2 mt-2 mb-3" id="questionTotalInfo">
+                        <i class="fas fa-calculator me-1"></i>
+                        <strong>Total from questions:</strong>
+                        <span id="questionsTotalValue"><?= number_format($total_from_questions,2) ?></span> / <?= number_format($submission['max_marks'],2) ?>
+                        <?php if (abs($total_from_questions - floatval($submission['marks_obtained'])) > 0.01): ?>
+                            <br><small class="text-danger">Note: Sum (<?= number_format($total_from_questions,2) ?>) differs from overall marks (<?= number_format($submission['marks_obtained'],2) ?>).</small>
+                        <?php endif; ?>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-outline-primary" onclick="recalculateQuestionTotal()">
+                            <i class="fas fa-sync-alt me-1"></i>Recalculate Total
+                        </button>
+                        <button type="button" class="btn btn-success" onclick="saveQuestionMarks()">
+                            <i class="fas fa-save me-1"></i>Save Question-wise Marks
+                        </button>
+                    </div>
+                </form>
+                <?php else: ?>
+                    <div class="alert alert-warning mb-0">
+                        <i class="fas fa-info-circle me-1"></i>No question-wise marks data available for this submission.
+                    </div>
+                <?php endif; ?>
             </div>
 
             <!-- Student Information -->
@@ -460,6 +529,50 @@ function overrideMarks() {
         });
     }
 }
+
+// Recalculate total from question inputs
+function recalculateQuestionTotal(){
+    const inputs = document.querySelectorAll('#questionMarksForm .q-mark-input');
+    let total = 0;
+    inputs.forEach(i=>{ total += (parseFloat(i.value)||0); });
+    document.getElementById('questionsTotalValue').textContent = total.toFixed(2);
+}
+
+// Save updated question-wise marks
+function saveQuestionMarks(){
+    if(!confirm('Save updated question-wise marks?')) return;
+    const form = document.getElementById('questionMarksForm');
+    if(!form) return;
+    const inputs = form.querySelectorAll('.q-mark-input');
+    const data = {};
+    inputs.forEach(i=>{
+        const qMatch = i.name.match(/q\[(\d+)\]/);
+        if(qMatch){
+            data[qMatch[1]] = parseFloat(i.value)||0;
+        }
+    });
+    // Prepare payload
+    const fd = new FormData();
+    fd.append('submission_id', '<?= (int)$submission_id ?>');
+    fd.append('question_marks', JSON.stringify(data));
+    // Optionally update marks_obtained to match sum
+    let total = 0; Object.values(data).forEach(v=> total += v);
+    fd.append('marks_obtained', total.toFixed(2));
+    fd.append('max_marks', '<?= number_format($submission['max_marks'],2) ?>');
+    fd.append('moderator_remarks', '');
+    fetch('save_moderator_review.php', { method:'POST', body: fd })
+        .then(r=> r.json())
+        .then(j=>{
+            if(j.success){
+                alert('✓ Question-wise marks saved.');
+                location.reload();
+            } else {
+                alert('✗ Failed: '+ (j.message||'Unknown error'));
+            }
+        })
+        .catch(err=> alert('✗ Error saving: '+err.message));
+}
+</script>
 </script>
 
 </div><!-- Close moderator-content -->

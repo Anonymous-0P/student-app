@@ -11,7 +11,11 @@ if(isset($_POST['login'])){
     $result = $stmt->get_result();
     if($result->num_rows == 1){
         $user = $result->fetch_assoc();
-        if(password_verify($password, $user['password'])){
+        
+        // Check if user account is active
+        if(isset($user['is_active']) && $user['is_active'] == 0){
+            $error = "Your account has been deactivated. Please contact the administrator.";
+        } elseif(password_verify($password, $user['password'])){
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['role'] = $user['role'];
             $_SESSION['name'] = $user['name'];

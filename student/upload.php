@@ -45,6 +45,18 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aja
         $respond('error', 'Access denied. You need to purchase this subject before uploading answer sheets.');
     }
 
+    // Enforce one submission per subject per student
+    $dupStmt = $conn->prepare("SELECT 1 FROM submissions WHERE student_id = ? AND subject_id = ? LIMIT 1");
+    if ($dupStmt) {
+        $dupStmt->bind_param("ii", $_SESSION['user_id'], $subject_id);
+        $dupStmt->execute();
+        $dupRes = $dupStmt->get_result();
+        if ($dupRes && $dupRes->num_rows > 0) {
+            $respond('error', 'You have already submitted for this subject. Only one submission allowed.');
+        }
+        $dupStmt->close();
+    }
+
     if(!isset($_FILES['pdf_file'])) {
         $respond('error', 'No PDF received. Please try again.');
     }

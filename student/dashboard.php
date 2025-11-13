@@ -34,45 +34,86 @@ $userStmt->bind_param("i", $student_id);
 $userStmt->execute();
 $user_info = $userStmt->get_result()->fetch_assoc();
 
-// Get comprehensive statistics
-$statsStmt = $conn->prepare("
-    SELECT 
+// Check if is_published column exists (migration applied)
+$hasIsPublished = false;
+$colCheck = $conn->query("SHOW COLUMNS FROM submissions LIKE 'is_published'");
+if ($colCheck && $colCheck->num_rows === 1) {
+    $hasIsPublished = true;
+}
+
+// Comprehensive statistics (conditional on migration)
+if ($hasIsPublished) {
+    $statsStmt = $conn->prepare("SELECT 
         COUNT(*) as total_submissions,
         SUM(CASE WHEN evaluation_status = 'under_review' THEN 1 ELSE 0 END) as under_review,
         SUM(CASE WHEN evaluation_status = 'evaluated' THEN 1 ELSE 0 END) as evaluated_submissions,
-        AVG(CASE WHEN marks_obtained IS NOT NULL AND max_marks > 0 THEN (marks_obtained/max_marks)*100 END) as avg_percentage
-    FROM submissions 
-    WHERE student_id = ?
-");
-$statsStmt->bind_param("i", $student_id);
-$statsStmt->execute();
-$stats = $statsStmt->get_result()->fetch_assoc();
+        AVG(CASE WHEN is_published = 1 AND marks_obtained IS NOT NULL AND max_marks > 0 THEN (marks_obtained/max_marks)*100 END) as avg_percentage
+        FROM submissions WHERE student_id = ?");
+} else {
+    $statsStmt = $conn->prepare("SELECT 
+        COUNT(*) as total_submissions,
+        SUM(CASE WHEN evaluation_status = 'under_review' THEN 1 ELSE 0 END) as under_review,
+        SUM(CASE WHEN evaluation_status = 'evaluated' THEN 1 ELSE 0 END) as evaluated_submissions,
+        AVG(CASE WHEN evaluation_status = 'evaluated' AND marks_obtained IS NOT NULL AND max_marks > 0 THEN (marks_obtained/max_marks)*100 END) as avg_percentage
+        FROM submissions WHERE student_id = ?");
+}
 
-// Get recent evaluation results (same query as view_submissions.php)
-$recentEvaluationsStmt = $conn->prepare("SELECT s.*, sub.code as subject_code, sub.name as subject_name, 
+if ($statsStmt) {
+    $statsStmt->bind_param("i", $student_id);
+    $statsStmt->execute();
+    $stats = $statsStmt->get_result()->fetch_assoc();
+} else {
+    $stats = [
+        'total_submissions' => 0,
+        'under_review' => 0,
+        'evaluated_submissions' => 0,
+        'avg_percentage' => null
+    ];
+}
+
+// Recent evaluations (gated display if migration applied)
+if ($hasIsPublished) {
+    $recentEvaluationsStmt = $conn->prepare("SELECT s.*, sub.code as subject_code, sub.name as subject_name, 
                        u.name as evaluator_name,
                        CASE 
-                           WHEN s.evaluation_status = 'evaluated' AND s.marks_obtained IS NOT NULL THEN 'Evaluated'
+                           WHEN s.is_published = 1 AND s.marks_obtained IS NOT NULL THEN 'Published'
+                           WHEN s.evaluation_status = 'evaluated' THEN 'Awaiting Approval'
                            WHEN s.evaluation_status = 'under_review' THEN 'Under Review'
                            WHEN s.status = 'pending' THEN 'Pending Review'
-                           WHEN s.status = 'approved' THEN 'Approved'
                            WHEN s.status = 'rejected' THEN 'Rejected'
                            ELSE 'Unknown'
                        END as status_display,
-                       CASE WHEN s.max_marks > 0 THEN (s.marks_obtained/s.max_marks)*100 ELSE 0 END as percentage
+                       CASE WHEN s.is_published = 1 AND s.max_marks > 0 THEN (s.marks_obtained/s.max_marks)*100 ELSE 0 END as percentage
                        FROM submissions s 
                        LEFT JOIN subjects sub ON s.subject_id = sub.id 
                        LEFT JOIN users u ON s.evaluator_id = u.id
                        WHERE s.student_id=? 
                        ORDER BY s.created_at DESC
                        LIMIT 3");
+} else {
+    $recentEvaluationsStmt = $conn->prepare("SELECT s.*, sub.code as subject_code, sub.name as subject_name, 
+                       u.name as evaluator_name,
+                       CASE 
+                           WHEN s.evaluation_status = 'evaluated' THEN 'Evaluated'
+                           WHEN s.evaluation_status = 'under_review' THEN 'Under Review'
+                           WHEN s.status = 'pending' THEN 'Pending Review'
+                           WHEN s.status = 'rejected' THEN 'Rejected'
+                           ELSE 'Unknown'
+                       END as status_display,
+                       CASE WHEN s.evaluation_status='evaluated' AND s.max_marks > 0 THEN (s.marks_obtained/s.max_marks)*100 ELSE 0 END as percentage
+                       FROM submissions s 
+                       LEFT JOIN subjects sub ON s.subject_id = sub.id 
+                       LEFT JOIN users u ON s.evaluator_id = u.id
+                       WHERE s.student_id=? 
+                       ORDER BY s.created_at DESC
+                       LIMIT 3");
+}
 $recentEvaluationsStmt->bind_param("i", $student_id);
 $recentEvaluationsStmt->execute();
 $recentEvaluations = $recentEvaluationsStmt->get_result();
 
-// Get purchased subjects for this student
-$purchasedStmt = $conn->prepare("
-    SELECT ps.*, s.code, s.name, s.description, s.department, s.year, s.semester, s.duration_days,
+// Purchased subjects
+$purchasedStmt = $conn->prepare("SELECT ps.*, s.code, s.name, s.description, s.department, s.year, s.semester, s.duration_days,
            DATEDIFF(ps.expiry_date, CURDATE()) as days_remaining,
            CASE 
                WHEN ps.expiry_date < CURDATE() THEN 'expired'
@@ -82,11 +123,79 @@ $purchasedStmt = $conn->prepare("
     FROM purchased_subjects ps
     JOIN subjects s ON ps.subject_id = s.id
     WHERE ps.student_id = ? AND ps.status = 'active'
-    ORDER BY ps.purchase_date DESC
-");
+    ORDER BY ps.purchase_date DESC");
 $purchasedStmt->bind_param("i", $student_id);
 $purchasedStmt->execute();
 $purchasedSubjects = $purchasedStmt->get_result();
+
+// Student analysis queries (subject performance & grade distribution)
+if ($hasIsPublished) {
+    $subjectPerformance = $conn->prepare("SELECT 
+                sub.code as subject_code,
+                sub.name as subject_name,
+                COUNT(s.id) as total_submissions,
+                AVG(CASE WHEN s.is_published = 1 AND s.marks_obtained IS NOT NULL AND s.max_marks > 0 THEN (s.marks_obtained/s.max_marks)*100 END) as avg_percentage,
+                MAX(CASE WHEN s.is_published = 1 AND s.marks_obtained IS NOT NULL AND s.max_marks > 0 THEN (s.marks_obtained/s.max_marks)*100 END) as best_percentage,
+                SUM(CASE WHEN s.evaluation_status = 'evaluated' THEN 1 ELSE 0 END) as evaluated_count
+            FROM submissions s
+            JOIN subjects sub ON s.subject_id = sub.id
+            WHERE s.student_id = ?
+            GROUP BY sub.id, sub.code, sub.name
+            ORDER BY avg_percentage DESC");
+} else {
+    $subjectPerformance = $conn->prepare("SELECT 
+                sub.code as subject_code,
+                sub.name as subject_name,
+                COUNT(s.id) as total_submissions,
+                AVG(CASE WHEN s.evaluation_status='evaluated' AND s.marks_obtained IS NOT NULL AND s.max_marks > 0 THEN (s.marks_obtained/s.max_marks)*100 END) as avg_percentage,
+                MAX(CASE WHEN s.evaluation_status='evaluated' AND s.marks_obtained IS NOT NULL AND s.max_marks > 0 THEN (s.marks_obtained/s.max_marks)*100 END) as best_percentage,
+                SUM(CASE WHEN s.evaluation_status = 'evaluated' THEN 1 ELSE 0 END) as evaluated_count
+            FROM submissions s
+            JOIN subjects sub ON s.subject_id = sub.id
+            WHERE s.student_id = ?
+            GROUP BY sub.id, sub.code, sub.name
+            ORDER BY avg_percentage DESC");
+}
+$subjectPerformance->bind_param("i", $student_id);
+$subjectPerformance->execute();
+$subjectResults = $subjectPerformance->get_result();
+
+if ($hasIsPublished) {
+    $gradeDistribution = $conn->prepare("SELECT 
+                CASE 
+                    WHEN (s.marks_obtained/s.max_marks)*100 >= 90 THEN 'A+'
+                    WHEN (s.marks_obtained/s.max_marks)*100 >= 80 THEN 'A'
+                    WHEN (s.marks_obtained/s.max_marks)*100 >= 70 THEN 'B+'
+                    WHEN (s.marks_obtained/s.max_marks)*100 >= 60 THEN 'B'
+                    WHEN (s.marks_obtained/s.max_marks)*100 >= 50 THEN 'C+'
+                    WHEN (s.marks_obtained/s.max_marks)*100 >= 35 THEN 'C'
+                    ELSE 'F'
+                END as grade,
+                COUNT(*) as count
+            FROM submissions s
+            WHERE s.student_id = ? AND s.is_published = 1 AND s.evaluation_status = 'evaluated' AND s.marks_obtained IS NOT NULL AND s.max_marks > 0
+            GROUP BY grade
+            ORDER BY grade");
+} else {
+    $gradeDistribution = $conn->prepare("SELECT 
+                CASE 
+                    WHEN (s.marks_obtained/s.max_marks)*100 >= 90 THEN 'A+'
+                    WHEN (s.marks_obtained/s.max_marks)*100 >= 80 THEN 'A'
+                    WHEN (s.marks_obtained/s.max_marks)*100 >= 70 THEN 'B+'
+                    WHEN (s.marks_obtained/s.max_marks)*100 >= 60 THEN 'B'
+                    WHEN (s.marks_obtained/s.max_marks)*100 >= 50 THEN 'C+'
+                    WHEN (s.marks_obtained/s.max_marks)*100 >= 35 THEN 'C'
+                    ELSE 'F'
+                END as grade,
+                COUNT(*) as count
+            FROM submissions s
+            WHERE s.student_id = ? AND s.evaluation_status = 'evaluated' AND s.marks_obtained IS NOT NULL AND s.max_marks > 0
+            GROUP BY grade
+            ORDER BY grade");
+}
+$gradeDistribution->bind_param("i", $student_id);
+$gradeDistribution->execute();
+$gradeResults = $gradeDistribution->get_result();
 
 $pageTitle = "Student Dashboard";
 $isIndexPage = false;
@@ -264,58 +373,6 @@ require_once('../includes/header.php');
     </div>
     <?php endif; ?>
   
-    <!-- Quick Actions -->
-    
-    <!-- Student Performance Analysis Section -->
-    <?php
-    // Get detailed analytics data for student analysis
-    
-    // 1. Subject-wise performance
-    $subjectPerformance = $conn->prepare("
-        SELECT 
-            sub.code as subject_code,
-            sub.name as subject_name,
-            COUNT(s.id) as total_submissions,
-            AVG(CASE WHEN s.marks_obtained IS NOT NULL AND s.max_marks > 0 THEN (s.marks_obtained/s.max_marks)*100 END) as avg_percentage,
-            MAX(CASE WHEN s.marks_obtained IS NOT NULL AND s.max_marks > 0 THEN (s.marks_obtained/s.max_marks)*100 END) as best_percentage,
-            SUM(CASE WHEN s.evaluation_status = 'evaluated' THEN 1 ELSE 0 END) as evaluated_count
-        FROM submissions s
-        JOIN subjects sub ON s.subject_id = sub.id
-        WHERE s.student_id = ?
-        GROUP BY sub.id, sub.code, sub.name
-        ORDER BY avg_percentage DESC
-    ");
-    $subjectPerformance->bind_param("i", $student_id);
-    $subjectPerformance->execute();
-    $subjectResults = $subjectPerformance->get_result();
-
-    // 2. Grade distribution
-    $gradeDistribution = $conn->prepare("
-        SELECT 
-            CASE 
-                WHEN (s.marks_obtained/s.max_marks)*100 >= 90 THEN 'A+'
-                WHEN (s.marks_obtained/s.max_marks)*100 >= 80 THEN 'A'
-                WHEN (s.marks_obtained/s.max_marks)*100 >= 70 THEN 'B+'
-                WHEN (s.marks_obtained/s.max_marks)*100 >= 60 THEN 'B'
-                WHEN (s.marks_obtained/s.max_marks)*100 >= 50 THEN 'C+'
-                WHEN (s.marks_obtained/s.max_marks)*100 >= 35 THEN 'C'
-                ELSE 'F'
-            END as grade,
-            COUNT(*) as count
-        FROM submissions s
-        WHERE s.student_id = ? AND s.evaluation_status = 'evaluated' AND s.marks_obtained IS NOT NULL AND s.max_marks > 0
-        GROUP BY grade
-        ORDER BY 
-            CASE grade
-                WHEN 'A+' THEN 1 WHEN 'A' THEN 2 WHEN 'B' THEN 3 
-                WHEN 'C' THEN 4 WHEN 'D' THEN 5 WHEN 'F' THEN 6
-            END
-    ");
-    $gradeDistribution->bind_param("i", $student_id);
-    $gradeDistribution->execute();
-    $gradeResults = $gradeDistribution->get_result();
-    ?>
-    
     <!-- Subject Selection -->
     
 <!-- Modal for evaluation feedback -->

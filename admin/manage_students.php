@@ -1,28 +1,28 @@
 <?php
 include('../config/config.php');
-include('../includes/header.php');
 require_once('../includes/functions.php');
 
 checkLogin('admin');
 
-// Handle AJAX request for user data
+// Handle AJAX request for user data (before any output)
 if(isset($_GET['action']) && $_GET['action'] == 'get_user' && isset($_GET['id'])) {
     $user_id = (int)$_GET['id'];
-    $stmt = $conn->prepare("SELECT * FROM users WHERE id = ? AND role = 'student'");
+    $stmt = $conn->prepare("SELECT id, name, email, phone, college_name, division, roll_no, is_active FROM users WHERE id = ? AND role = 'student'");
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
     $result = $stmt->get_result();
     
+    header('Content-Type: application/json');
     if($result->num_rows > 0) {
         $user = $result->fetch_assoc();
-        header('Content-Type: application/json');
         echo json_encode($user);
     } else {
-        header('Content-Type: application/json');
         echo json_encode(['error' => 'Student not found']);
     }
     exit;
 }
+
+include('../includes/header.php');
 
 // Handle student creation
 if(isset($_POST['create_user'])) {
@@ -450,7 +450,7 @@ $studentStats = $conn->query("SELECT
                     <div class="table-responsive">
                         <table class="table table-hover">
                             <thead class="table-light">
-                                <tr>
+                                <tr class="text-center">
                                     <th>Student Info</th>
                                     <th>College Details</th>
                                     <th>Contact</th>

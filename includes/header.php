@@ -644,6 +644,11 @@ $userName = $_SESSION['name'] ?? '';
                             <i class="fas fa-clock"></i> Pending Evaluations
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="<?= $baseUrl ?>evaluator/evaluation_schemes.php">
+                            <i class="fas fa-file-contract"></i> Evaluation Schemes
+                        </a>
+                    </li>
                 </ul>
             </div>
             
@@ -702,6 +707,11 @@ $userName = $_SESSION['name'] ?? '';
                     <li class="nav-item">
                         <a class="nav-link" href="<?= $baseUrl ?>moderator/submissions.php?status=pending">
                             <i class="fas fa-clock"></i> Pending Submissions
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="<?= $baseUrl ?>moderator/evaluation_schemes.php">
+                            <i class="fas fa-file-contract"></i> Evaluation Schemes
                         </a>
                     </li>
                 </ul>
@@ -775,8 +785,8 @@ $userName = $_SESSION['name'] ?? '';
                 </h6>
                 <ul class="nav flex-column">
                     <li class="nav-item">
-                        <a class="nav-link" href="<?= $baseUrl ?>admin/answer_sheets.php">
-                            <i class="fas fa-file-document"></i> Answer Sheets
+                        <a class="nav-link" href="<?= $baseUrl ?>admin/manage_evaluation_schemes.php">
+                            <i class="fas fa-file-contract"></i> Evaluation Schemes
                         </a>
                     </li>
                     <li class="nav-item">

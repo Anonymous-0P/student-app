@@ -74,12 +74,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_evaluation']))
             $max_marks = floatval($_POST['max_marks']);
             $evaluator_remarks = trim($_POST['evaluator_remarks']);
             
-            // Process per-question marks if provided
-            $question_marks = isset($_POST['question_marks']) ? $_POST['question_marks'] : [];
-            // Debug log for question marks
-            error_log('EVALUATOR SUBMIT: question_marks=' . print_r($question_marks, true));
+            // Process per-question marks - SERVER SIDE
+            // Read question_marks array directly from POST data
+            $question_marks = [];
+            
+            error_log('EVALUATOR SUBMIT: Raw POST data=' . print_r($_POST, true));
+            
+            // Method 1: Check for question_marks array (most reliable)
+            if (isset($_POST['question_marks']) && is_array($_POST['question_marks'])) {
+                foreach ($_POST['question_marks'] as $q_num => $q_mark) {
+                    // Include zeros too so moderator sees full breakdown
+                    $mark_value = is_numeric($q_mark) ? floatval($q_mark) : 0.0;
+                    $question_marks[$q_num] = $mark_value;
+                }
+                error_log('EVALUATOR SUBMIT: question_marks from array=' . print_r($question_marks, true));
+            }
+            
+            // Method 2: Fallback to JSON if array is empty
+            if (empty($question_marks) && isset($_POST['question_marks_json']) && !empty($_POST['question_marks_json'])) {
+                $decoded = json_decode($_POST['question_marks_json'], true);
+                if (is_array($decoded)) {
+                    $question_marks = $decoded;
+                    error_log('EVALUATOR SUBMIT: question_marks from JSON=' . print_r($question_marks, true));
+                }
+            }
+            
+            // Validate that we have question marks
+            if (empty($question_marks)) {
+                error_log('EVALUATOR SUBMIT: ERROR - No question marks received!');
+                $_SESSION['error_message'] = 'Question-wise marks are mandatory. Please fill in marks for each question.';
+                header("Location: evaluate.php?id=" . $submission_id);
+                exit();
+            }
+            
             $per_question_marks_json = json_encode($question_marks);
-            error_log('EVALUATOR SUBMIT: per_question_marks_json=' . $per_question_marks_json);
+            error_log('EVALUATOR SUBMIT: Final per_question_marks_json=' . $per_question_marks_json);
             
             // Handle annotated PDF file upload
             $annotated_pdf_path = null;
@@ -200,7 +229,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_evaluation']))
             }
             $stmt->execute();
             
-            // Try to update additional columns if they exist
+            // Try to update per_question_marks and extra fields; if schema lacks columns, gracefully fallback
+            $savedPerQuestion = false;
             try {
                 $additional_update_query = "UPDATE submissions SET 
                     per_question_marks = ?,
@@ -211,11 +241,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_evaluation']))
                 $stmt2 = $conn->prepare($additional_update_query);
                 if ($stmt2) {
                     $stmt2->bind_param("sdsi", $per_question_marks_json, $percentage, $grade, $submission_id);
-                    $stmt2->execute();
+                    $savedPerQuestion = $stmt2->execute();
+                    if ($savedPerQuestion) {
+                        error_log("EVALUATOR SUBMIT: per_question_marks saved with extras for submission $submission_id");
+                        error_log("EVALUATOR SUBMIT: Data saved: $per_question_marks_json");
+                    } else {
+                        error_log("EVALUATOR SUBMIT: Failed to save per_question_marks with extras: " . $stmt2->error);
+                    }
+                    $stmt2->close();
+                } else {
+                    error_log("EVALUATOR SUBMIT: Prepare failed for extras update (likely missing columns): " . $conn->error);
                 }
             } catch (Exception $e) {
-                // These columns might not exist, that's okay
-                error_log("Could not update additional submission fields: " . $e->getMessage());
+                error_log("EVALUATOR SUBMIT: Exception during extras update: " . $e->getMessage());
+            }
+
+            // Fallback: ensure per_question_marks is saved even if percentage/grade/is_published don't exist
+            if (!$savedPerQuestion) {
+                try {
+                    $stmt2b = $conn->prepare("UPDATE submissions SET per_question_marks = ? WHERE id = ?");
+                    if ($stmt2b) {
+                        $stmt2b->bind_param("si", $per_question_marks_json, $submission_id);
+                        if ($stmt2b->execute()) {
+                            error_log("EVALUATOR SUBMIT: per_question_marks saved via fallback for submission $submission_id");
+                        } else {
+                            error_log("EVALUATOR SUBMIT: Fallback update failed: " . $stmt2b->error);
+                        }
+                        $stmt2b->close();
+                    } else {
+                        error_log("EVALUATOR SUBMIT: Fallback prepare failed: " . $conn->error);
+                    }
+                } catch (Exception $e) {
+                    error_log("EVALUATOR SUBMIT: Exception during fallback update: " . $e->getMessage());
+                }
             }
             
             // Update submission assignment status (keep as accepted since completed is tracked in submissions table)
@@ -261,7 +319,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_evaluation']))
                 }
             }
             
-            // Notify student about evaluation completion
+            // Notify student about evaluation completion (DEFERRED VISIBILITY: student sees marks only after publish)
             try {
                 $percentage = ($max_marks > 0) ? round(($marks_obtained / $max_marks) * 100, 1) : 0;
                 $grade = '';
@@ -689,10 +747,7 @@ $pageTitle = "Evaluate Submission";
                                         <i class="fas fa-calculator me-2"></i>Marks Allocation
                                         <span class="badge bg-danger ms-2" style="font-size: 0.65rem;">Required *</span>
                                     </h6>
-                                    <div class="alert alert-warning py-2 px-3 mb-3" style="font-size: 0.75rem;">
-                                        <i class="fas fa-exclamation-triangle me-1"></i>
-                                        <strong>Fill marks for each question.</strong> Total will be calculated automatically.
-                                    </div>
+                                    
 
                                     <?php
                                     // Division-based question template
@@ -1198,13 +1253,14 @@ $pageTitle = "Evaluate Submission";
             updateTotalMarks();
         });
         
-        // Form validation
+        // Form validation - SIMPLIFIED VERSION
+        // Just validate question marks are filled, then let form submit normally
         document.getElementById('evaluationForm').addEventListener('submit', function(e) {
             const marksObtained = parseFloat(document.getElementById('marks_obtained').value);
             const maxMarks = parseFloat(document.getElementById('max_marks').value);
             const remarks = document.getElementById('evaluator_remarks').value.trim();
             
-            // Check if at least one question mark is filled
+            // Check if question marks are filled
             const questionMarks = document.querySelectorAll('.per-question-mark');
             let hasQuestionMarks = false;
             let totalQuestionMarks = 0;
@@ -1217,63 +1273,77 @@ $pageTitle = "Evaluate Submission";
                 totalQuestionMarks += value;
             });
             
+            // Validate question marks are mandatory
             if (!hasQuestionMarks || totalQuestionMarks === 0) {
                 e.preventDefault();
                 
-                // Add visual highlight to all question inputs
+                // Add visual highlight
                 questionMarks.forEach(function(input) {
                     input.classList.add('highlight-required');
                 });
                 
-                // Remove highlight after animation
                 setTimeout(function() {
                     questionMarks.forEach(function(input) {
                         input.classList.remove('highlight-required');
                     });
                 }, 1500);
                 
-                alert('⚠️ Question-wise marks are mandatory!\n\nPlease fill in the marks for each question before submitting.\nThe total marks will be calculated automatically.');
-                // Scroll to first question input
+                alert('⚠️ Question-wise marks are mandatory!\n\nPlease fill in the marks for each question before submitting.');
                 if (questionMarks.length > 0) {
                     questionMarks[0].focus();
                     questionMarks[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
-                return;
+                return false;
             }
             
+            // Validate other fields
             if (isNaN(marksObtained) || marksObtained < 0) {
                 e.preventDefault();
                 alert('Please enter valid marks obtained (must be 0 or greater).');
-                return;
+                return false;
             }
             
             if (isNaN(maxMarks) || maxMarks <= 0) {
                 e.preventDefault();
                 alert('Please enter valid maximum marks (must be greater than 0).');
-                return;
+                return false;
             }
             
             if (marksObtained > maxMarks) {
                 e.preventDefault();
                 alert('Marks obtained cannot be greater than maximum marks.');
-                return;
+                return false;
             }
             
             if (remarks.length < 10) {
                 e.preventDefault();
                 alert('Please provide detailed evaluation comments (at least 10 characters).');
                 document.getElementById('evaluator_remarks').focus();
-                return;
+                return false;
             }
             
             // Final confirmation
             const percentage = ((marksObtained / maxMarks) * 100).toFixed(1);
-            const grade = document.getElementById('grade').textContent;
+            let grade = 'F';
+            if (percentage >= 90) grade = 'A+';
+            else if (percentage >= 85) grade = 'A';
+            else if (percentage >= 80) grade = 'A-';
+            else if (percentage >= 75) grade = 'B+';
+            else if (percentage >= 70) grade = 'B';
+            else if (percentage >= 65) grade = 'B-';
+            else if (percentage >= 60) grade = 'C+';
+            else if (percentage >= 55) grade = 'C';
+            else if (percentage >= 50) grade = 'C-';
+            else if (percentage >= 35) grade = 'D';
             
             if (!confirm(`Are you sure you want to submit this evaluation?\n\nMarks: ${marksObtained}/${maxMarks} (${percentage}%)\nGrade: ${grade}\n\nThis action cannot be undone.`)) {
                 e.preventDefault();
-                return;
+                return false;
             }
+            
+            // Let form submit normally - all question_marks[] inputs will be included in POST
+            console.log('Form validation passed, submitting normally...');
+            return true;
         });
         
         // Auto-save functionality (saves to localStorage for recovery)

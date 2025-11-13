@@ -1,11 +1,10 @@
 <?php
 include('../config/config.php');
-include('../includes/header.php');
 require_once('../includes/functions.php');
 
 checkLogin('admin');
 
-// Handle AJAX request for moderator subjects
+// Handle AJAX request for moderator subjects (before any output)
 if(isset($_GET['action']) && $_GET['action'] == 'get_moderator_subjects' && isset($_GET['id'])) {
     $moderator_id = (int)$_GET['id'];
     
@@ -96,6 +95,8 @@ if(isset($_GET['action']) && $_GET['action'] == 'get_moderator' && isset($_GET['
     }
     exit;
 }
+
+include('../includes/header.php');
 
 // Handle moderator creation
 if(isset($_POST['create_moderator'])) {
@@ -692,7 +693,7 @@ if($is_active_check && $is_active_check->num_rows > 0) {
                     <div class="table-responsive">
                         <table class="table table-hover">
                             <thead class="table-light">
-                                <tr>
+                                <tr class="text-center">
                                     <th>Moderator Info</th>
                                     <th>Assignments</th>
                                     <th>Contact</th>

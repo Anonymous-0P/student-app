@@ -513,8 +513,19 @@ body {
                     <input type="hidden" name="submission_id" value="<?= $submission_id ?>">
                     
                     <?php
-                    // Get per-question marks if available
-                    $per_question = isset($submission['per_question_marks']) ? json_decode($submission['per_question_marks'], true) : [];
+                    // Get per-question marks if available with error handling
+                    $per_question = [];
+                    if (!empty($submission['per_question_marks'])) {
+                        $decoded = json_decode($submission['per_question_marks'], true);
+                        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                            $per_question = $decoded;
+                            error_log("MODERATOR REVIEW: Successfully decoded per_question_marks for submission {$submission['id']}: " . print_r($per_question, true));
+                        } else {
+                            error_log("MODERATOR REVIEW: Failed to decode per_question_marks for submission {$submission['id']}: " . json_last_error_msg());
+                        }
+                    } else {
+                        error_log("MODERATOR REVIEW: No per_question_marks data for submission {$submission['id']}");
+                    }
                     
                     // Ensure marks_obtained has a value (needed for display later)
                     $marks_value = isset($submission['marks_obtained']) && $submission['marks_obtained'] !== '' && $submission['marks_obtained'] !== null 
@@ -832,13 +843,14 @@ body {
                 <span class="status-badge status-<?= $submission['status'] ?>">
                     <?= ucfirst(str_replace('_', ' ', $submission['status'])) ?>
                 </span>
-                <?php if ($submission['status'] === 'evaluated' && !$submission['is_published']): ?>
+                <?php $isPublished = !empty($submission['is_published']); ?>
+                <?php if ($submission['status'] === 'evaluated' && !$isPublished): ?>
                     <div class="mt-3">
                         <button type="button" class="btn btn-success" onclick="approveAndPublish()">
                             <i class="fas fa-check-circle me-2"></i>Approve and Publish to Student
                         </button>
                     </div>
-                <?php elseif ($submission['is_published']): ?>
+                <?php elseif ($isPublished): ?>
                     <div class="mt-3">
                         <span class="badge bg-success">Published & Visible to Student</span>
                     </div>

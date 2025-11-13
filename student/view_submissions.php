@@ -59,26 +59,60 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'student'){
     exit;
 }
 
-// Get submissions with subject details and evaluator information
-$stmt = $conn->prepare("SELECT s.*, sub.code as subject_code, sub.name as subject_name, 
-                       u.name as evaluator_name,
-                       CASE 
-                           WHEN s.evaluation_status = 'evaluated' AND s.marks_obtained IS NOT NULL THEN 'Evaluated'
-                           WHEN s.evaluation_status = 'under_review' THEN 'Under Review'
-                           WHEN s.status = 'pending' THEN 'Pending Review'
-                           WHEN s.status = 'approved' THEN 'Approved'
-                           WHEN s.status = 'rejected' THEN 'Rejected'
-                           ELSE 'Unknown'
-                       END as status_display,
-                       CASE WHEN s.max_marks > 0 THEN (s.marks_obtained/s.max_marks)*100 ELSE 0 END as percentage
-                       FROM submissions s 
-                       LEFT JOIN subjects sub ON s.subject_id = sub.id 
-                       LEFT JOIN users u ON s.evaluator_id = u.id
-                       WHERE s.student_id=? 
-                       ORDER BY s.created_at DESC");
-$stmt->bind_param("i", $_SESSION['user_id']);
-$stmt->execute();
-$result = $stmt->get_result();
+// Detect if publication column exists (migration may not yet be applied)
+$hasPublishColumn = false;
+$colCheck = $conn->query("SHOW COLUMNS FROM submissions LIKE 'is_published'");
+if ($colCheck && $colCheck->num_rows === 1) { $hasPublishColumn = true; }
+
+if ($hasPublishColumn) {
+    $query = "SELECT s.*, sub.code as subject_code, sub.name as subject_name, 
+                     u.name as evaluator_name,
+                     CASE 
+                         WHEN s.is_published = 1 AND s.marks_obtained IS NOT NULL THEN 'Published'
+                         WHEN s.evaluation_status = 'evaluated' THEN 'Awaiting Approval'
+                         WHEN s.evaluation_status = 'under_review' THEN 'Under Review'
+                         WHEN s.status = 'pending' THEN 'Pending Review'
+                         WHEN s.status = 'rejected' THEN 'Rejected'
+                         ELSE 'Unknown'
+                     END as status_display,
+                     CASE WHEN s.is_published = 1 AND s.max_marks > 0 THEN (s.marks_obtained/s.max_marks)*100 ELSE 0 END as percentage
+                     FROM submissions s 
+                     LEFT JOIN subjects sub ON s.subject_id = sub.id 
+                     LEFT JOIN users u ON s.evaluator_id = u.id
+                     WHERE s.student_id=? 
+                     ORDER BY s.created_at DESC";
+} else {
+    // Fallback query without is_published (treat evaluated as awaiting approval and hide marks)
+    $query = "SELECT s.*, sub.code as subject_code, sub.name as subject_name, 
+                     u.name as evaluator_name,
+                     CASE 
+                         WHEN s.evaluation_status = 'evaluated' AND s.marks_obtained IS NOT NULL THEN 'Awaiting Approval'
+                         WHEN s.evaluation_status = 'under_review' THEN 'Under Review'
+                         WHEN s.status = 'pending' THEN 'Pending Review'
+                         WHEN s.status = 'rejected' THEN 'Rejected'
+                         ELSE 'Unknown'
+                     END as status_display,
+                     0 as percentage,
+                     0 as is_published
+                     FROM submissions s 
+                     LEFT JOIN subjects sub ON s.subject_id = sub.id 
+                     LEFT JOIN users u ON s.evaluator_id = u.id
+                     WHERE s.student_id=? 
+                     ORDER BY s.created_at DESC";
+}
+
+$stmt = $conn->prepare($query);
+if(!$stmt){
+    // Show graceful error instead of fatal
+    echo '<div class="alert alert-danger m-3">Database error preparing submissions query: ' . htmlspecialchars($conn->error) . '<br>Run migration file <code>db/add_publish_gating_columns.sql</code> and refresh.</div>';
+    $result = new class {
+        public $num_rows = 0; public function fetch_assoc(){ return null; }
+    }; // empty result shim
+} else {
+    $stmt->bind_param("i", $_SESSION['user_id']);
+    $stmt->execute();
+    $result = $stmt->get_result();
+}
 ?>
 
 <div class="container-fluid px-2 px-md-3">
@@ -121,8 +155,8 @@ $result = $stmt->get_result();
                             <?php 
                             // Status badge styling
                             $statusClass = 'bg-warning';
-                            if($row['status_display'] == 'Evaluated') $statusClass = 'bg-success';
-                            if($row['status_display'] == 'Approved') $statusClass = 'bg-success';
+                            if($row['status_display'] == 'Published') $statusClass = 'bg-success';
+                            if($row['status_display'] == 'Awaiting Approval') $statusClass = 'bg-warning';
                             if($row['status_display'] == 'Rejected') $statusClass = 'bg-danger';
                             if($row['status_display'] == 'Under Review') $statusClass = 'bg-info';
                             
@@ -162,7 +196,7 @@ $result = $stmt->get_result();
                                     </span>
                                 </td>
                                 <td>
-                                    <?php if($row['marks_obtained'] !== null && $row['max_marks'] > 0): ?>
+                                    <?php if($row['is_published'] == 1 && $row['marks_obtained'] !== null && $row['max_marks'] > 0): ?>
                                         <div class="fw-bold text-success">
                                             <?= number_format((float)$row['marks_obtained'], 1) ?> / <?= number_format((float)$row['max_marks'], 1) ?>
                                         </div>
@@ -170,6 +204,8 @@ $result = $stmt->get_result();
                                             <span class="badge bg-primary"><?= number_format($percentage, 1) ?>%</span>
                                             <span class="badge bg-secondary ms-1">Grade: <?= $grade ?></span>
                                         </div>
+                                    <?php elseif($row['evaluation_status'] == 'evaluated'): ?>
+                                        <span class="text-muted">Awaiting Moderator Approval</span>
                                     <?php else: ?>
                                         <span class="text-muted">Not evaluated</span>
                                     <?php endif; ?>
@@ -203,7 +239,7 @@ $result = $stmt->get_result();
                                                 💬 Feedback
                                             </button>
                                         <?php endif; ?>
-                                        <?php if($row['marks_obtained'] !== null && $row['status_display'] == 'Evaluated'): ?>
+                                        <?php if($row['is_published'] == 1 && $row['marks_obtained'] !== null && $row['status_display'] == 'Published'): ?>
                                             <button class="btn btn-sm btn-outline-warning" 
                                                     onclick="showRateEvaluator(<?= $row['id'] ?>, '<?= htmlspecialchars($row['subject_code']) ?>')"
                                                     title="Rate Evaluator">
@@ -227,8 +263,8 @@ $result = $stmt->get_result();
                     while($row = $result->fetch_assoc()): 
                         // Status badge styling
                         $statusClass = 'bg-warning';
-                        if($row['status_display'] == 'Evaluated') $statusClass = 'bg-success';
-                        if($row['status_display'] == 'Approved') $statusClass = 'bg-success';
+                        if($row['status_display'] == 'Published') $statusClass = 'bg-success';
+                        if($row['status_display'] == 'Awaiting Approval') $statusClass = 'bg-warning';
                         if($row['status_display'] == 'Rejected') $statusClass = 'bg-danger';
                         if($row['status_display'] == 'Under Review') $statusClass = 'bg-info';
                         
@@ -293,7 +329,7 @@ $result = $stmt->get_result();
                             </div>
                             
                             <!-- Marks Section -->
-                            <?php if($row['marks_obtained'] !== null && $row['max_marks'] > 0): ?>
+                            <?php if($row['is_published'] == 1 && $row['marks_obtained'] !== null && $row['max_marks'] > 0): ?>
                                 <div class="bg-light rounded p-2 mb-2">
                                     <div class="row g-2 text-center">
                                         <div class="col-4">
@@ -314,6 +350,13 @@ $result = $stmt->get_result();
                                         </div>
                                     </div>
                                 </div>
+                            <?php elseif($row['evaluation_status'] == 'evaluated'): ?>
+                                <div class="bg-light rounded p-2 mb-2 text-center">
+                                    <div class="text-muted small">
+                                        <i class="fas fa-hourglass-half me-1"></i>
+                                        Awaiting Moderator Approval
+                                    </div>
+                                </div>
                             <?php else: ?>
                                 <div class="bg-light rounded p-2 mb-2 text-center">
                                     <div class="text-muted small">
@@ -330,7 +373,7 @@ $result = $stmt->get_result();
                                     📄 View PDF
                                 </a>
                                 
-                                <?php if($row['evaluator_remarks'] || $row['marks_obtained'] !== null): ?>
+                                <?php if($row['evaluator_remarks'] || ($row['is_published'] == 1 && $row['marks_obtained'] !== null)): ?>
                                     <div class="row g-2">
                                         <?php if($row['evaluator_remarks']): ?>
                                             <div class="col-6">
@@ -340,7 +383,7 @@ $result = $stmt->get_result();
                                                 </button>
                                             </div>
                                         <?php endif; ?>
-                                        <?php if($row['marks_obtained'] !== null && $row['status_display'] == 'Evaluated'): ?>
+                                        <?php if($row['is_published'] == 1 && $row['marks_obtained'] !== null && $row['status_display'] == 'Published'): ?>
                                             <div class="col-<?= $row['evaluator_remarks'] ? '6' : '12' ?>">
                                                 <button class="btn btn-outline-warning w-100 mobile-action-btn" 
                                                         onclick="showRateEvaluator(<?= $row['id'] ?>, '<?= htmlspecialchars($row['subject_code']) ?>')">
