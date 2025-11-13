@@ -43,17 +43,24 @@ $stmt->bind_param("i", $moderator_id);
 $stmt->execute();
 $stats['evaluators'] = $stmt->get_result()->fetch_assoc()['evaluator_count'];
 
-// Get submission statistics
+// Get submission statistics - join through evaluator's moderator_id
 $submissions_query = "SELECT 
-    COUNT(*) as total_submissions,
-    SUM(CASE WHEN s.status = 'pending' THEN 1 ELSE 0 END) as pending,
-    SUM(CASE WHEN s.status = 'assigned' OR s.status = 'evaluating' THEN 1 ELSE 0 END) as under_review,
-    SUM(CASE WHEN s.status = 'evaluated' THEN 1 ELSE 0 END) as evaluated,
-    SUM(CASE WHEN s.status = 'approved' THEN 1 ELSE 0 END) as approved
+    COUNT(DISTINCT s.id) as total_submissions,
+    SUM(CASE WHEN (s.status = 'pending' OR s.status = 'Submitted') 
+        AND (s.evaluation_status IS NULL OR s.evaluation_status NOT IN ('evaluated', 'approved')) 
+        THEN 1 ELSE 0 END) as pending,
+    SUM(CASE WHEN s.status IN ('assigned', 'evaluating', 'Under Evaluation') 
+        OR s.evaluation_status = 'under_review' 
+        THEN 1 ELSE 0 END) as under_review,
+    SUM(CASE WHEN s.status = 'evaluated' OR s.evaluation_status = 'evaluated' 
+        THEN 1 ELSE 0 END) as evaluated,
+    SUM(CASE WHEN s.status = 'approved' OR s.evaluation_status = 'approved' 
+        THEN 1 ELSE 0 END) as approved
     FROM submissions s
-    WHERE s.moderator_id = ?";
+    LEFT JOIN users u ON s.evaluator_id = u.id
+    WHERE u.moderator_id = ? OR s.moderator_id = ?";
 $stmt = $conn->prepare($submissions_query);
-$stmt->bind_param("i", $moderator_id);
+$stmt->bind_param("ii", $moderator_id, $moderator_id);
 $stmt->execute();
 $submission_stats = $stmt->get_result()->fetch_assoc();
 $stats = array_merge($stats, $submission_stats);
@@ -85,17 +92,23 @@ $evaluator_performance_query = "SELECT
     u.id as evaluator_id,
     u.name as evaluator_name,
     u.email as evaluator_email,
-    COUNT(DISTINCT sa.submission_id) as total_assignments,
-    COUNT(DISTINCT CASE WHEN sa.status = 'completed' THEN sa.submission_id END) as completed_assignments,
-    COUNT(DISTINCT CASE WHEN sa.status = 'accepted' THEN sa.submission_id END) as in_progress_assignments,
-    COUNT(DISTINCT CASE WHEN sa.status = 'pending' THEN sa.submission_id END) as pending_assignments,
+    COUNT(DISTINCT s.id) as total_assignments,
+    COUNT(DISTINCT CASE WHEN s.status = 'evaluated' OR s.evaluation_status = 'evaluated' 
+        THEN s.id END) as completed_assignments,
+    COUNT(DISTINCT CASE WHEN s.status IN ('assigned', 'evaluating', 'Under Evaluation') 
+        OR s.evaluation_status = 'under_review'
+        THEN s.id END) as in_progress_assignments,
+    COUNT(DISTINCT CASE 
+        WHEN (s.status = 'pending' OR s.status = 'Submitted') 
+        AND (s.evaluation_status IS NULL OR s.evaluation_status NOT IN ('evaluated', 'approved', 'under_review'))
+        THEN s.id END) as pending_assignments,
     AVG(CASE WHEN s.marks_obtained IS NOT NULL AND s.max_marks > 0 
         THEN (s.marks_obtained / s.max_marks) * 100 END) as avg_marks_percentage,
-    COUNT(DISTINCT CASE WHEN s.evaluation_status = 'evaluated' AND s.updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) 
+    COUNT(DISTINCT CASE WHEN (s.status = 'evaluated' OR s.evaluation_status = 'evaluated') 
+        AND s.evaluated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) 
         THEN s.id END) as evaluations_this_week
     FROM users u
-    LEFT JOIN submission_assignments sa ON u.id = sa.evaluator_id
-    LEFT JOIN submissions s ON sa.submission_id = s.id
+    LEFT JOIN submissions s ON u.id = s.evaluator_id
     WHERE u.role = 'evaluator' AND u.moderator_id = ? AND u.is_active = 1
     GROUP BY u.id, u.name, u.email
     ORDER BY completed_assignments DESC, u.name";
@@ -680,47 +693,6 @@ body {
 
 <div class="container">
     <!-- Statistics Cards -->
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <div class="stat-icon blue">
-                    <i class="fas fa-book"></i>
-                </div>
-            </div>
-            <div class="stat-value"><?= $stats['subjects'] ?></div>
-            <div class="stat-label">Assigned Subjects</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <div class="stat-icon green">
-                    <i class="fas fa-users"></i>
-                </div>
-            </div>
-            <div class="stat-value"><?= $stats['evaluators'] ?></div>
-            <div class="stat-label">Supervised Evaluators</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <div class="stat-icon amber">
-                    <i class="fas fa-clock"></i>
-                </div>
-            </div>
-            <div class="stat-value"><?= $stats['pending'] + $stats['under_review'] ?></div>
-            <div class="stat-label">Pending Reviews</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <div class="stat-icon cyan">
-                    <i class="fas fa-check-circle"></i>
-                </div>
-            </div>
-            <div class="stat-value"><?= $stats['evaluated'] + $stats['approved'] ?></div>
-            <div class="stat-label">Completed Reviews</div>
-        </div>
-    </div>
 
     <!-- Evaluator Performance -->
     <div class="card">
@@ -729,9 +701,7 @@ body {
                 <i class="fas fa-chart-line"></i>
                 Evaluator Performance
             </h5>
-            <a href="evaluator_performance.php" class="btn btn-outline btn-sm">
-                View Details
-            </a>
+            
         </div>
 
         <div class="table-wrapper">
@@ -773,15 +743,22 @@ body {
                             </td>
                             <td>
                                 <?php 
-                                $status = 'Active';
-                                $badge_class = 'badge-success';
-                                if($evaluator['pending_assignments'] > 0) {
-                                    $status = 'Pending';
-                                    $badge_class = 'badge-warning';
-                                }
-                                if($evaluator['in_progress_assignments'] > 0) {
+                                // Determine status based on priority: completed > in progress > pending
+                                if($evaluator['completed_assignments'] > 0 && $evaluator['in_progress_assignments'] == 0 && $evaluator['pending_assignments'] == 0) {
+                                    $status = 'Completed';
+                                    $badge_class = 'badge-success';
+                                } elseif($evaluator['in_progress_assignments'] > 0) {
                                     $status = 'Working';
                                     $badge_class = 'badge-info';
+                                } elseif($evaluator['pending_assignments'] > 0) {
+                                    $status = 'Pending';
+                                    $badge_class = 'badge-warning';
+                                } elseif($evaluator['total_assignments'] > 0) {
+                                    $status = 'Active';
+                                    $badge_class = 'badge-success';
+                                } else {
+                                    $status = 'Idle';
+                                    $badge_class = 'badge-gray';
                                 }
                                 ?>
                                 <span class="badge <?= $badge_class ?>"><?= $status ?></span>
@@ -816,20 +793,9 @@ body {
                                 </span>
                             </td>
                             <td>
-                                <div class="btn-group">
-                                    <a href="assign_evaluator.php?evaluator_id=<?= $evaluator['evaluator_id'] ?>" 
-                                       class="btn btn-outline btn-icon" title="Assign Work">
-                                        <i class="fas fa-plus"></i>
-                                    </a>
-                                    <a href="marks_access.php?evaluator_id=<?= $evaluator['evaluator_id'] ?>&evaluator_name=<?= urlencode($evaluator['evaluator_name']) ?>" 
-                                       class="btn btn-outline btn-icon" title="Marks Access">
-                                        <i class="fas fa-check-double"></i>
-                                    </a>
-                                    <a href="evaluator_performance.php?id=<?= $evaluator['evaluator_id'] ?>" 
-                                       class="btn btn-outline btn-icon" title="View Details">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                </div>
+                                <a href="submissions.php" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-list-alt"></i> View Submissions
+                                </a>
                             </td>
                         </tr>
                         <?php endforeach; ?>
@@ -909,7 +875,7 @@ body {
     <?php endif; ?>
 
     <!-- Assigned Subjects -->
-    <div class="card">
+    <!-- <div class="card">
         <div class="card-header">
             <h5 class="card-title">
                 <i class="fas fa-book-open"></i>
@@ -982,7 +948,7 @@ body {
                 </tbody>
             </table>
         </div>
-    </div>
+    </div> -->
 </div>
 
 <!-- Detailed Ratings Modal -->

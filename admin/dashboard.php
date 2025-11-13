@@ -201,6 +201,22 @@ checkLogin('admin');
     line-height: 1.6;
 }
 
+/* Evaluator Avatar Circle */
+.evaluator-avatar {
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.875rem;
+    margin-right: 10px;
+    vertical-align: middle;
+}
+
 /* Offcanvas Menu Styles */
 .offcanvas-body .nav-section {
     margin-bottom: 0.5rem;
@@ -340,8 +356,24 @@ $tableExists = $conn->query("SHOW TABLES LIKE 'evaluator_ratings'");
 $ratingsTableExists = ($tableExists && $tableExists->num_rows > 0);
 
 if ($ratingsTableExists) {
-    // Get evaluator ratings summary
+    // Pagination for evaluator ratings
+    $ratings_per_page = 5;
+    $ratings_page = isset($_GET['ratings_page']) ? max(1, intval($_GET['ratings_page'])) : 1;
+    $ratings_offset = ($ratings_page - 1) * $ratings_per_page;
+    
+    // Get total count of evaluators with ratings
+    $totalRatingsCount = $conn->query("SELECT COUNT(DISTINCT u.id) as total
+        FROM users u
+        LEFT JOIN evaluator_ratings er ON u.id = er.evaluator_id
+        WHERE u.role = 'evaluator' AND u.is_active = 1
+        GROUP BY u.id
+        HAVING COUNT(er.id) > 0");
+    $total_evaluators_with_ratings = $totalRatingsCount ? $totalRatingsCount->num_rows : 0;
+    $total_ratings_pages = ceil($total_evaluators_with_ratings / $ratings_per_page);
+    
+    // Get evaluator ratings summary with pagination
     $evaluatorRatings = $conn->query("SELECT 
+        u.id as evaluator_id,
         u.name as evaluator_name,
         COUNT(er.id) as total_ratings,
         AVG(er.overall_rating) as avg_overall,
@@ -355,7 +387,7 @@ if ($ratingsTableExists) {
         GROUP BY u.id, u.name
         HAVING total_ratings > 0
         ORDER BY avg_overall DESC, total_ratings DESC
-        LIMIT 10");
+        LIMIT $ratings_per_page OFFSET $ratings_offset");
 
     // Get rating statistics
     $ratingStatsResult = $conn->query("SELECT 
@@ -509,10 +541,10 @@ if ($ratingsTableExists) {
         </div>
 
         <div class="col-md-3 fade-in" style="animation-delay: 0.8s;">
-            <a href="answer_sheets.php" class="action-card">
+            <a href="manage_evaluation_schemes.php" class="action-card">
                 <div class="text-center">
                     <div class="action-icon"><i class="fas fa-file-alt"></i></div>
-                    <h6 class="mb-2">Answer Sheets</h6>
+                    <h6 class="mb-2">Scheme of Evaluation</h6>
                     <p class="small text-muted mb-0">View, verify, and approve uploads</p>
                 </div>
             </a>
@@ -549,12 +581,12 @@ if ($ratingsTableExists) {
             </a>
         </div>
         <div class="col-md-3 fade-in" style="animation-delay: 1.2s;">
-            <a href="evaluation_ratings.php" class="text-decoration-none">
+            <a href="smtp_settings.php" class="text-decoration-none">
                 <div class="action-card" style="cursor: pointer;">
                     <div class="text-center">
-                        <div class="action-icon"><i class="fas fa-star"></i></div>
-                        <h6 class="mb-2">Evaluation Rating</h6>
-                        <p class="small text-muted mb-0">View evaluator ratings and feedback</p>
+                        <div class="action-icon"><i class="fas fa-envelope-open-text"></i></div>
+                        <h6 class="mb-2">Email Configuration</h6>
+                        <p class="small text-muted mb-0">Manage SMTP server settings</p>
                     </div>
                 </div>
             </a>
@@ -565,7 +597,7 @@ if ($ratingsTableExists) {
     <!-- Data Tables Row -->
     <div class="row g-4">
         <!-- Subject Performance -->
-        <div class="col-md-6 fade-in" style="animation-delay: 0.9s;">
+        <!-- <div class="col-md-6 fade-in" style="animation-delay: 0.9s;">
             <div class="dashboard-card">
                 <h5 class="mb-3"><i class="fas fa-book text-primary"></i> Subject Performance</h5>
                 <?php if($subjectStats->num_rows > 0): ?>
@@ -602,10 +634,10 @@ if ($ratingsTableExists) {
                     <p class="text-muted text-center py-3">No subject data available</p>
                 <?php endif; ?>
             </div>
-        </div>
+        </div> -->
 
         <!-- Evaluator Performance -->
-        <div class="col-md-6 fade-in" style="animation-delay: 1.0s;">
+        <!-- <div class="col-md-6 fade-in" style="animation-delay: 1.0s;">
             <div class="dashboard-card">
                 <h5 class="mb-3"><i class="fas fa-chalkboard-teacher text-info"></i> Evaluator Performance</h5>
                 <?php if($evaluatorPerf->num_rows > 0): ?>
@@ -641,7 +673,7 @@ if ($ratingsTableExists) {
                     <p class="text-muted text-center py-3">No evaluator data available</p>
                 <?php endif; ?>
             </div>
-        </div>
+        </div> -->
 
         <!-- Evaluator Feedback -->
        
@@ -669,56 +701,114 @@ if ($ratingsTableExists) {
                 </div>
 
                 <?php if($evaluatorRatings && $evaluatorRatings->num_rows > 0): ?>
-                    <div class="row">
-                        <?php while($rating = $evaluatorRatings->fetch_assoc()): ?>
-                            <div class="col-md-6 col-lg-4 mb-3">
-                                <div class="border rounded-3 p-3 h-100 bg-light">
-                                    <div class="d-flex justify-content-between align-items-start mb-2">
-                                        <h6 class="mb-1 text-truncate" title="<?= htmlspecialchars($rating['evaluator_name']) ?>">
-                                            <?= htmlspecialchars($rating['evaluator_name']) ?>
-                                        </h6>
-                                        <span class="badge bg-primary"><?= $rating['total_ratings'] ?> reviews</span>
-                                    </div>
-                                    
-                                    <div class="mb-2">
-                                        <div class="d-flex align-items-center mb-1">
-                                            <span class="fw-bold text-warning me-2"><?= number_format($rating['avg_overall'], 1) ?></span>
-                                            <div class="stars-small">
-                                                <?php 
-                                                $overall = round($rating['avg_overall']);
-                                                for($i = 1; $i <= 5; $i++): ?>
-                                                    <i class="fas fa-star <?= $i <= $overall ? 'text-warning' : 'text-muted' ?>"></i>
-                                                <?php endfor; ?>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr class="text-center">
+                                    <th>Evaluator Name</th>
+                                    <th>Total Reviews</th>
+                                    <th>Overall Rating</th>
+                                    <th>Quality</th>
+                                    <th>Helpfulness</th>
+                                   
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php 
+                                $evaluatorRatings->data_seek(0);
+                                while($rating = $evaluatorRatings->fetch_assoc()): 
+                                    $overallRating = round($rating['avg_overall']);
+                                    $ratingClass = $rating['avg_overall'] >= 4 ? 'success' : ($rating['avg_overall'] >= 3 ? 'warning' : 'danger');
+                                ?>
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <div class="evaluator-avatar">
+                                                    <?= strtoupper(substr($rating['evaluator_name'], 0, 1)) ?>
+                                                </div>
+                                                <strong><?= htmlspecialchars($rating['evaluator_name']) ?></strong>
                                             </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="rating-breakdown">
-                                        <div class="d-flex justify-content-between align-items-center mb-1">
-                                            <small class="text-muted">Excellent Quality:</small>
-                                            <span class="badge bg-success"><?= $rating['excellent_quality'] ?></span>
-                                        </div>
-                                        <div class="d-flex justify-content-between align-items-center mb-1">
-                                            <small class="text-muted">Good Quality:</small>
-                                            <span class="badge bg-primary"><?= $rating['good_quality'] ?></span>
-                                        </div>
-                                        <div class="d-flex justify-content-between align-items-center mb-1">
-                                            <small class="text-muted">Very Helpful:</small>
-                                            <span class="badge bg-info"><?= $rating['very_helpful'] ?></span>
-                                        </div>
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <small class="text-muted">Helpful:</small>
-                                            <span class="badge bg-outline-secondary"><?= $rating['helpful'] ?></span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        <?php endwhile; ?>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge bg-primary"><?= $rating['total_ratings'] ?></span>
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="d-flex align-items-center justify-content-center">
+                                                <span class="fw-bold text-<?= $ratingClass ?> me-2"><?= number_format($rating['avg_overall'], 1) ?></span>
+                                                <div class="stars-small">
+                                                    <?php for($i = 1; $i <= 5; $i++): ?>
+                                                        <i class="fas fa-star <?= $i <= $overallRating ? 'text-warning' : 'text-muted' ?>" style="font-size: 0.85rem;"></i>
+                                                    <?php endfor; ?>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="d-flex flex-column small">
+                                                <span class="text-success"><i class="fas fa-check-circle"></i> <?= $rating['excellent_quality'] ?> Excellent</span>
+                                                <span class="text-primary"><i class="fas fa-thumbs-up"></i> <?= $rating['good_quality'] ?> Good</span>
+                                            </div>
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="d-flex flex-column small">
+                                                <span class="text-success"><i class="fas fa-star"></i> <?= $rating['very_helpful'] ?> Very Helpful</span>
+                                                <span class="text-info"><i class="fas fa-info-circle"></i> <?= $rating['helpful'] ?> Helpful</span>
+                                            </div>
+                                        </td>
+                                        
+                                    </tr>
+                                <?php endwhile; ?>
+                            </tbody>
+                        </table>
                     </div>
                     
+                    <?php if($total_ratings_pages > 1): ?>
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <div class="text-muted small">
+                                Showing page <?= $ratings_page ?> of <?= $total_ratings_pages ?> (<?= $total_evaluators_with_ratings ?> evaluators)
+                            </div>
+                            <nav>
+                                <ul class="pagination pagination-sm mb-0">
+                                    <?php if($ratings_page > 1): ?>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?ratings_page=<?= $ratings_page - 1 ?>" aria-label="Previous">
+                                                <span aria-hidden="true">&laquo;</span>
+                                            </a>
+                                        </li>
+                                    <?php else: ?>
+                                        <li class="page-item disabled">
+                                            <span class="page-link">&laquo;</span>
+                                        </li>
+                                    <?php endif; ?>
+                                    
+                                    <?php for($i = 1; $i <= $total_ratings_pages; $i++): ?>
+                                        <?php if($i == $ratings_page): ?>
+                                            <li class="page-item active"><span class="page-link"><?= $i ?></span></li>
+                                        <?php elseif($i == 1 || $i == $total_ratings_pages || abs($i - $ratings_page) <= 2): ?>
+                                            <li class="page-item"><a class="page-link" href="?ratings_page=<?= $i ?>"><?= $i ?></a></li>
+                                        <?php elseif(abs($i - $ratings_page) == 3): ?>
+                                            <li class="page-item disabled"><span class="page-link">...</span></li>
+                                        <?php endif; ?>
+                                    <?php endfor; ?>
+                                    
+                                    <?php if($ratings_page < $total_ratings_pages): ?>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?ratings_page=<?= $ratings_page + 1 ?>" aria-label="Next">
+                                                <span aria-hidden="true">&raquo;</span>
+                                            </a>
+                                        </li>
+                                    <?php else: ?>
+                                        <li class="page-item disabled">
+                                            <span class="page-link">&raquo;</span>
+                                        </li>
+                                    <?php endif; ?>
+                                </ul>
+                            </nav>
+                        </div>
+                    <?php endif; ?>
+                    
                     <div class="text-center mt-3">
-                        <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#detailedRatingsModal">
-                            <i class="fas fa-eye"></i> View Detailed Ratings
+                        <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#detailedRatingsModal">
+                            <i class="fas fa-chart-bar me-2"></i> View Complete Analytics
                         </button>
                     </div>
                 <?php else: ?>

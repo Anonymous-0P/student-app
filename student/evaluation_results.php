@@ -67,8 +67,14 @@ if ($answer_sheet_id) {
     }
 }
 
+$isIndexPage = false;
 include '../includes/header.php';
 ?>
+
+<?php require_once('includes/sidebar.php'); ?>
+
+<div class="dashboard-layout">
+    <div class="main-content">
 
 <div class="container-fluid py-4">
     <!-- Header Section -->
@@ -441,5 +447,8 @@ include '../includes/header.php';
     --bs-bg-opacity: 0.1;
 }
 </style>
+
+    </div>
+</div>
 
 <?php include '../includes/footer.php'; ?>

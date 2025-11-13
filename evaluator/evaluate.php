@@ -74,12 +74,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_evaluation']))
             $max_marks = floatval($_POST['max_marks']);
             $evaluator_remarks = trim($_POST['evaluator_remarks']);
             
-            // Process per-question marks if provided
-            $question_marks = isset($_POST['question_marks']) ? $_POST['question_marks'] : [];
+            // Process per-question marks - SERVER SIDE
+            // Read question_marks array directly from POST data
+            $question_marks = [];
+            
+            error_log('EVALUATOR SUBMIT: Raw POST data=' . print_r($_POST, true));
+            
+            // Method 1: Check for question_marks array (most reliable)
+            if (isset($_POST['question_marks']) && is_array($_POST['question_marks'])) {
+                foreach ($_POST['question_marks'] as $q_num => $q_mark) {
+                    // Include zeros too so moderator sees full breakdown
+                    $mark_value = is_numeric($q_mark) ? floatval($q_mark) : 0.0;
+                    $question_marks[$q_num] = $mark_value;
+                }
+                error_log('EVALUATOR SUBMIT: question_marks from array=' . print_r($question_marks, true));
+            }
+            
+            // Method 2: Fallback to JSON if array is empty
+            if (empty($question_marks) && isset($_POST['question_marks_json']) && !empty($_POST['question_marks_json'])) {
+                $decoded = json_decode($_POST['question_marks_json'], true);
+                if (is_array($decoded)) {
+                    $question_marks = $decoded;
+                    error_log('EVALUATOR SUBMIT: question_marks from JSON=' . print_r($question_marks, true));
+                }
+            }
+            
+            // Validate that we have question marks
+            if (empty($question_marks)) {
+                error_log('EVALUATOR SUBMIT: ERROR - No question marks received!');
+                $_SESSION['error_message'] = 'Question-wise marks are mandatory. Please fill in marks for each question.';
+                header("Location: evaluate.php?id=" . $submission_id);
+                exit();
+            }
+            
             $per_question_marks_json = json_encode($question_marks);
+            error_log('EVALUATOR SUBMIT: Final per_question_marks_json=' . $per_question_marks_json);
             
             // Handle annotated PDF file upload
             $annotated_pdf_path = null;
+            $pdf_replaced = false;
             if (isset($_FILES['annotated_pdf']) && $_FILES['annotated_pdf']['error'] === UPLOAD_ERR_OK) {
                 $uploaded_file = $_FILES['annotated_pdf'];
                 
@@ -88,20 +121,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_evaluation']))
                 $allowed_types = ['application/pdf'];
                 
                 if (in_array($file_type, $allowed_types)) {
-                    // Create annotated PDFs directory if it doesn't exist
-                    $upload_dir = dirname(__DIR__) . '/uploads/annotated_pdfs';
-                    if (!is_dir($upload_dir)) {
-                        mkdir($upload_dir, 0775, true);
-                    }
+                    // Get the original PDF path and create backup
+                    $original_pdf_url = $submission['pdf_url'];
                     
-                    // Generate unique filename
-                    $filename = 'annotated_' . $submission_id . '_' . time() . '.pdf';
-                    $file_path = $upload_dir . '/' . $filename;
-                    $relative_path = 'uploads/annotated_pdfs/' . $filename;
-                    
-                    // Move uploaded file
-                    if (move_uploaded_file($uploaded_file['tmp_name'], $file_path)) {
-                        $annotated_pdf_path = $relative_path;
+                    if ($original_pdf_url) {
+                        // Create backup directory if it doesn't exist
+                        $backup_dir = dirname(__DIR__) . '/uploads/pdfs/backups';
+                        if (!is_dir($backup_dir)) {
+                            mkdir($backup_dir, 0775, true);
+                        }
+                        
+                        // Get original file path
+                        $original_file_path = dirname(__DIR__) . '/' . $original_pdf_url;
+                        
+                        // Create backup of original PDF
+                        if (file_exists($original_file_path)) {
+                            $backup_filename = 'backup_' . $submission_id . '_' . time() . '_' . basename($original_pdf_url);
+                            $backup_path = $backup_dir . '/' . $backup_filename;
+                            copy($original_file_path, $backup_path);
+                        }
+                        
+                        // Replace the original PDF with the annotated one
+                        if (move_uploaded_file($uploaded_file['tmp_name'], $original_file_path)) {
+                            $annotated_pdf_path = $original_pdf_url; // Use the same path
+                            $pdf_replaced = true;
+                        }
+                    } else {
+                        // If no original PDF URL exists, create new one in pdfs folder
+                        $upload_dir = dirname(__DIR__) . '/uploads/pdfs';
+                        if (!is_dir($upload_dir)) {
+                            mkdir($upload_dir, 0775, true);
+                        }
+                        
+                        // Generate filename
+                        $filename = 'submission_' . $submission_id . '_' . time() . '.pdf';
+                        $file_path = $upload_dir . '/' . $filename;
+                        $relative_path = 'uploads/pdfs/' . $filename;
+                        
+                        // Move uploaded file
+                        if (move_uploaded_file($uploaded_file['tmp_name'], $file_path)) {
+                            $annotated_pdf_path = $relative_path;
+                            $pdf_replaced = true;
+                        }
                     }
                 }
             }
@@ -129,12 +190,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_evaluation']))
                 $conn->begin_transaction();
         
         try {
-            // Update submission with evaluation (include annotated PDF if provided)
-            if ($annotated_pdf_path) {
+            // Update submission with evaluation
+            if ($pdf_replaced && $annotated_pdf_path) {
+                // When PDF is replaced, update pdf_url and set annotated_pdf_url
                 $update_submission_query = "UPDATE submissions SET 
                     marks_obtained = ?, 
                     max_marks = ?, 
                     evaluator_remarks = ?, 
+                    pdf_url = ?,
                     annotated_pdf_url = ?,
                     status = 'evaluated',
                     evaluation_status = 'evaluated',
@@ -146,7 +209,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_evaluation']))
                 if (!$stmt) {
                     throw new Exception("Prepare failed for submission update: " . $conn->error);
                 }
-                $stmt->bind_param("ddssi", $marks_obtained, $max_marks, $evaluator_remarks, $annotated_pdf_path, $submission_id);
+                $stmt->bind_param("ddsssi", $marks_obtained, $max_marks, $evaluator_remarks, $annotated_pdf_path, $annotated_pdf_path, $submission_id);
             } else {
                 $update_submission_query = "UPDATE submissions SET 
                     marks_obtained = ?, 
@@ -166,22 +229,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_evaluation']))
             }
             $stmt->execute();
             
-            // Try to update additional columns if they exist
+            // Try to update per_question_marks and extra fields; if schema lacks columns, gracefully fallback
+            $savedPerQuestion = false;
             try {
                 $additional_update_query = "UPDATE submissions SET 
                     per_question_marks = ?,
                     percentage = ?,
-                    grade = ?
+                    grade = ?,
+                    is_published = 0
                     WHERE id = ?";
-                
                 $stmt2 = $conn->prepare($additional_update_query);
                 if ($stmt2) {
                     $stmt2->bind_param("sdsi", $per_question_marks_json, $percentage, $grade, $submission_id);
-                    $stmt2->execute();
+                    $savedPerQuestion = $stmt2->execute();
+                    if ($savedPerQuestion) {
+                        error_log("EVALUATOR SUBMIT: per_question_marks saved with extras for submission $submission_id");
+                        error_log("EVALUATOR SUBMIT: Data saved: $per_question_marks_json");
+                    } else {
+                        error_log("EVALUATOR SUBMIT: Failed to save per_question_marks with extras: " . $stmt2->error);
+                    }
+                    $stmt2->close();
+                } else {
+                    error_log("EVALUATOR SUBMIT: Prepare failed for extras update (likely missing columns): " . $conn->error);
                 }
             } catch (Exception $e) {
-                // These columns might not exist, that's okay
-                error_log("Could not update additional submission fields: " . $e->getMessage());
+                error_log("EVALUATOR SUBMIT: Exception during extras update: " . $e->getMessage());
+            }
+
+            // Fallback: ensure per_question_marks is saved even if percentage/grade/is_published don't exist
+            if (!$savedPerQuestion) {
+                try {
+                    $stmt2b = $conn->prepare("UPDATE submissions SET per_question_marks = ? WHERE id = ?");
+                    if ($stmt2b) {
+                        $stmt2b->bind_param("si", $per_question_marks_json, $submission_id);
+                        if ($stmt2b->execute()) {
+                            error_log("EVALUATOR SUBMIT: per_question_marks saved via fallback for submission $submission_id");
+                        } else {
+                            error_log("EVALUATOR SUBMIT: Fallback update failed: " . $stmt2b->error);
+                        }
+                        $stmt2b->close();
+                    } else {
+                        error_log("EVALUATOR SUBMIT: Fallback prepare failed: " . $conn->error);
+                    }
+                } catch (Exception $e) {
+                    error_log("EVALUATOR SUBMIT: Exception during fallback update: " . $e->getMessage());
+                }
             }
             
             // Update submission assignment status (keep as accepted since completed is tracked in submissions table)
@@ -227,7 +319,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_evaluation']))
                 }
             }
             
-            // Notify student about evaluation completion
+            // Notify student about evaluation completion (DEFERRED VISIBILITY: student sees marks only after publish)
             try {
                 $percentage = ($max_marks > 0) ? round(($marks_obtained / $max_marks) * 100, 1) : 0;
                 $grade = '';
@@ -264,8 +356,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_evaluation']))
             
             $conn->commit();
             
-            $_SESSION['success_message'] = "Evaluation submitted successfully! The submission has been sent back to the moderator.";
-            header("Location: pending_evaluations.php");
+            // Send evaluation completion email to student (no marks shown)
+            require_once('../includes/mail_helper.php');
+            $emailResult = sendEvaluationCompletedEmail(
+                $submission['student_email'],
+                $submission['student_name'],
+                $submission['subject_code'],
+                $submission['subject_name']
+            );
+            
+            // Store email status (optional - for debugging)
+            if (!$emailResult['success']) {
+                error_log("Failed to send evaluation email: " . $emailResult['message']);
+            }
+            
+            $_SESSION['success_message'] = "Evaluation submitted successfully! The student has been notified via email.";
+            header("Location: assignments.php");
             exit();
             
         } catch (Exception $e) {
@@ -291,101 +397,293 @@ $pageTitle = "Evaluate Submission";
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="../assets/css/style.css" rel="stylesheet">
     <style>
+        :root {
+            --primary-color: #2563eb;
+            --primary-dark: #1e40af;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --text-dark: #1f2937;
+            --text-muted: #6b7280;
+            --border-color: #e5e7eb;
+            --bg-light: #f9fafb;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #ffffff;
+            color: var(--text-dark);
+            line-height: 1.6;
+        }
+        
         .evaluation-page {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #ffffff;
             min-height: 100vh;
             padding-top: 10px;
         }
         
         .evaluation-container {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 15px;
-            padding: 30px;
-            margin-bottom: 25px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
         
         .submission-info {
-            background: rgba(108, 92, 231, 0.1);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 25px;
-            border-left: 5px solid #6c5ce7;
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+            border-left: 3px solid var(--primary-color);
         }
         
         .pdf-viewer {
-            border: 2px solid #dee2e6;
+            border: 1px solid var(--border-color);
             border-radius: 8px;
-            background: #f8f9fa;
-            min-height: 1000px;
+            background: #ffffff;
+            min-height: 1200px;
         }
         
         .evaluation-form {
-            background: rgba(255, 255, 255, 0.9);
-            border-radius: 12px;
-            padding: 25px;
-            border: 1px solid rgba(0, 0, 0, 0.1);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            max-height: calc(100vh - 100px);
+            overflow-y: auto;
+            overflow-x: hidden;
         }
         
         .marks-input {
-            font-size: 1.2rem;
+            font-size: 1rem;
             font-weight: 600;
             text-align: center;
-            padding: 15px;
-            border: 2px solid #6c5ce7;
-            border-radius: 10px;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+        }
+        
+        .marks-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
         }
         
         .marks-display {
-            background: linear-gradient(45deg, #6c5ce7, #a29bfe);
-            color: white;
-            padding: 15px;
-            border-radius: 10px;
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 1rem;
+            border-radius: 6px;
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 1rem;
+            border: 1px solid #bfdbfe;
         }
         
         .btn-submit-evaluation {
-            background: linear-gradient(45deg, #28a745, #20c997);
+            background: var(--success-color);
             border: none;
             color: white;
-            font-weight: 600;
-            padding: 15px 30px;
-            border-radius: 25px;
-            font-size: 1.1rem;
-            transition: all 0.3s ease;
+            font-weight: 500;
+            padding: 0.625rem 1.25rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            transition: all 0.15s;
         }
         
         .btn-submit-evaluation:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
+            background: #059669;
             color: white;
         }
         
         .deadline-warning {
-            background: rgba(255, 193, 7, 0.1);
-            border: 1px solid #ffc107;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 20px;
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fde68a;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 1rem;
         }
         
         .deadline-danger {
-            background: rgba(220, 53, 69, 0.1);
-            border: 1px solid #dc3545;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 20px;
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 1rem;
         }
         
         .marks-breakdown {
-            background: rgba(40, 167, 69, 0.1);
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 20px;
+            background: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        
+        /* Question input styling */
+        .question-input-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 6px;
+            white-space: nowrap;
+        }
+        
+        .question-input-group .form-control {
+            width: 50px;
+            min-width: 50px;
+            text-align: center;
+            font-weight: 500;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 0.25rem 0.25rem;
+            font-size: 0.8125rem;
+            flex-shrink: 0;
+            transition: all 0.2s ease;
+        }
+        
+        .question-input-group .form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+        
+        .question-input-group .form-control.highlight-required {
+            border-color: #dc3545;
+            background-color: #fff5f5;
+            animation: shake 0.5s;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        
+        .question-label {
+            min-width: 22px;
+            font-weight: 500;
+            color: var(--text-dark);
+            font-size: 0.8125rem;
+            flex-shrink: 0;
+        }
+        
+        .marks-divider {
+            color: var(--text-muted);
+            font-weight: 500;
+            font-size: 0.8125rem;
+            flex-shrink: 0;
+        }
+        
+        .marks-breakdown .col-12 {
+            display: block;
+        }
+        
+        /* Reduce spacing in marks breakdown */
+        .marks-breakdown .row {
+            margin-bottom: 0.5rem;
+        }
+        
+        .marks-breakdown h6 {
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+        
+        .marks-breakdown .mb-2 {
+            margin-bottom: 0.5rem !important;
+        }
+        
+        .marks-breakdown .mb-3 {
+            margin-bottom: 0.75rem !important;
+        }
+        
+        /* Feedback suggestion buttons */
+        .feedback-suggestion {
+            font-size: 0.75rem;
+            padding: 0.375rem 0.75rem;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+            transition: all 0.15s;
+            cursor: pointer;
+            width: 100%;
+            text-align: center;
+        }
+        
+        .feedback-suggestion:hover {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+        
+        .feedback-suggestion i {
+            display: none;
+        }
+
+        .feedback-buttons-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-control {
+            font-size: 0.875rem;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .form-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-dark);
+            margin-bottom: 0.5rem;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.625rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            border-radius: 4px;
+            line-height: 1;
+        }
+
+        .badge.bg-success { background: #dcfce7; color: #166534; }
+        .badge.bg-warning { background: #fef3c7; color: #92400e; }
+        .badge.bg-info { background: #dbeafe; color: #1e40af; }
+        .badge.bg-danger { background: #fee2e2; color: #991b1b; }
+        .badge.bg-secondary { background: #f3f4f6; color: #374151; }
+        .badge.bg-primary { background: #dbeafe; color: #1e40af; }
+
+        h5, h6 {
+            color: var(--text-dark);
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            .evaluation-container {
+                padding: 1rem;
+            }
+            
+            .evaluation-form {
+                padding: 0.75rem;
+            }
         }
     </style>
 </head>
@@ -395,45 +693,19 @@ $pageTitle = "Evaluate Submission";
     <div class="evaluation-page rounded">
         <div class="container-fluid">
             <!-- Page Header -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="text-center text-white">
-                        <h1 class="display-6 mb-3">
-                            <i class="fas fa-clipboard-check me-3"></i>
-                            Evaluate Submission
-                        </h1>
-                        <nav aria-label="breadcrumb">
-                            <ol class="breadcrumb justify-content-center">
-                                <li class="breadcrumb-item">
-                                    <a href="dashboard.php" class="text-white-50">Dashboard</a>
-                                </li>
-                                <li class="breadcrumb-item">
-                                    <a href="pending_evaluations.php" class="text-white-50">Pending Evaluations</a>
-                                </li>
-                                <li class="breadcrumb-item active text-white" aria-current="page">Evaluate</li>
-                            </ol>
-                        </nav>
-                    </div>
-                </div>
-            </div>
+            
 
 
             <!-- Main Content -->
             <div class="row">
                 <!-- Left Panel - Submission View -->
-                <div class="col-md-8">
+                <div class="col-md-10">
                     <div class="evaluation-container px-2 py-2">
-                        <!-- Download Button for Annotation -->
-                       
-                        
-                        <!-- Submission Information -->
-                        
-
                         <!-- PDF Viewer -->
                         <div class="pdf-viewer">
                             <?php if ($submission['pdf_url'] && file_exists('../uploads/pdfs/' . basename($submission['pdf_url']))): ?>
                                 <iframe src="../uploads/pdfs/<?php echo htmlspecialchars(basename($submission['pdf_url'])); ?>" 
-                                        width="100%" height="1000px" style="border: none; border-radius: 8px;">
+                                        width="100%" height="1200px" style="border: none; border-radius: 8px;">
                                     <p>Your browser doesn't support PDF viewing. 
                                        <a href="../uploads/pdfs/<?php echo htmlspecialchars(basename($submission['pdf_url'])); ?>" target="_blank">
                                            Click here to view the PDF
@@ -455,7 +727,7 @@ $pageTitle = "Evaluate Submission";
                 </div>
 
                 <!-- Right Panel - Evaluation Form -->
-                <div class="col-md-4">
+                <div class="col-md-2">
                     <div class="evaluation-container px-1 py-2">
                         <?php if (isset($error_message)): ?>
                             <div class="alert alert-danger">
@@ -473,7 +745,9 @@ $pageTitle = "Evaluate Submission";
                                 <div class="marks-breakdown">
                                     <h6 class="mb-3">
                                         <i class="fas fa-calculator me-2"></i>Marks Allocation
+                                        <span class="badge bg-danger ms-2" style="font-size: 0.65rem;">Required *</span>
                                     </h6>
+                                    
 
                                     <?php
                                     // Division-based question template
@@ -509,15 +783,18 @@ $pageTitle = "Evaluate Submission";
                                             <div class="mb-2">
                                                 <strong><?php echo $part['label']; ?>:</strong>
                                             </div>
-                                            <div class="row g-2 align-items-end mb-3">
+                                            <div class="row g-2 align-items-center mb-3">
                                                 <?php for ($j = 1; $j <= $part['count']; $j++, $q_number++): ?>
-                                                    <div class="col-6">
-                                                        <label class="form-label">Q<?php echo $q_number; ?> (out of <?php echo $part['marks']; ?>)</label>
-                                                        <input type="number"
-                                                               class="form-control per-question-mark"
-                                                               name="question_marks[<?php echo $q_number; ?>]"
-                                                               min="0" max="<?php echo $part['marks']; ?>" step="0.25"
-                                                               value="<?php echo isset($per_question[$q_number]) ? htmlspecialchars($per_question[$q_number]) : ''; ?>">
+                                                    <div class="col-12">
+                                                        <div class="question-input-group">
+                                                            <span class="question-label">Q<?php echo $q_number; ?></span>
+                                                            <input type="number"
+                                                                   class="form-control per-question-mark"
+                                                                   name="question_marks[<?php echo $q_number; ?>]"
+                                                                   min="0" max="<?php echo $part['marks']; ?>" step="0.25"
+                                                                   value="<?php echo isset($per_question[$q_number]) ? htmlspecialchars($per_question[$q_number]) : ''; ?>">
+                                                            <span class="marks-divider">/ <?php echo $part['marks']; ?></span>
+                                                        </div>
                                                     </div>
                                                 <?php endfor; ?>
                                             </div>
@@ -551,15 +828,18 @@ $pageTitle = "Evaluate Submission";
                                             <div class="mb-2">
                                                 <strong><?php echo $part['label']; ?>:</strong>
                                             </div>
-                                            <div class="row g-2 align-items-end mb-3">
+                                            <div class="row g-2 align-items-center mb-3">
                                                 <?php for ($j = 1; $j <= $part['count']; $j++, $q_number++): ?>
-                                                    <div class="col-6">
-                                                        <label class="form-label">Q<?php echo $q_number; ?> (out of <?php echo $part['marks']; ?>)</label>
-                                                        <input type="number"
-                                                               class="form-control per-question-mark"
-                                                               name="question_marks[<?php echo $q_number; ?>]"
-                                                               min="0" max="<?php echo $part['marks']; ?>" step="0.25"
-                                                               value="<?php echo isset($per_question[$q_number]) ? htmlspecialchars($per_question[$q_number]) : ''; ?>">
+                                                    <div class="col-12">
+                                                        <div class="question-input-group">
+                                                            <span class="question-label">Q<?php echo $q_number; ?></span>
+                                                            <input type="number"
+                                                                   class="form-control per-question-mark"
+                                                                   name="question_marks[<?php echo $q_number; ?>]"
+                                                                   min="0" max="<?php echo $part['marks']; ?>" step="0.25"
+                                                                   value="<?php echo isset($per_question[$q_number]) ? htmlspecialchars($per_question[$q_number]) : ''; ?>">
+                                                            <span class="marks-divider">/ <?php echo $part['marks']; ?></span>
+                                                        </div>
                                                     </div>
                                                 <?php endfor; ?>
                                             </div>
@@ -591,15 +871,18 @@ $pageTitle = "Evaluate Submission";
                                             <div class="mb-2">
                                                 <strong><?php echo $part['label']; ?>:</strong>
                                             </div>
-                                            <div class="row g-2 align-items-end mb-3">
+                                            <div class="row g-2 align-items-center mb-3">
                                                 <?php for ($j = 1; $j <= $part['count']; $j++, $q_number++): ?>
-                                                    <div class="col-6">
-                                                        <label class="form-label">Q<?php echo $q_number; ?> (out of <?php echo $part['marks']; ?>)</label>
-                                                        <input type="number"
-                                                               class="form-control per-question-mark"
-                                                               name="question_marks[<?php echo $q_number; ?>]"
-                                                               min="0" max="<?php echo $part['marks']; ?>" step="0.25"
-                                                               value="<?php echo isset($per_question[$q_number]) ? htmlspecialchars($per_question[$q_number]) : ''; ?>">
+                                                    <div class="col-12">
+                                                        <div class="question-input-group">
+                                                            <span class="question-label">Q<?php echo $q_number; ?></span>
+                                                            <input type="number"
+                                                                   class="form-control per-question-mark"
+                                                                   name="question_marks[<?php echo $q_number; ?>]"
+                                                                   min="0" max="<?php echo $part['marks']; ?>" step="0.25"
+                                                                   value="<?php echo isset($per_question[$q_number]) ? htmlspecialchars($per_question[$q_number]) : ''; ?>">
+                                                            <span class="marks-divider">/ <?php echo $part['marks']; ?></span>
+                                                        </div>
                                                     </div>
                                                 <?php endfor; ?>
                                             </div>
@@ -624,15 +907,18 @@ $pageTitle = "Evaluate Submission";
                                             <div class="mb-2">
                                                 <strong><?php echo $part['label']; ?>:</strong>
                                             </div>
-                                            <div class="row g-2 align-items-end mb-3">
+                                            <div class="row g-2 align-items-center mb-3">
                                                 <?php for ($j = 1; $j <= $part['count']; $j++, $q_number++): ?>
-                                                    <div class="col-6">
-                                                        <label class="form-label">Q<?php echo $q_number; ?> (out of <?php echo $part['marks']; ?>)</label>
-                                                        <input type="number"
-                                                               class="form-control per-question-mark"
-                                                               name="question_marks[<?php echo $q_number; ?>]"
-                                                               min="0" max="<?php echo $part['marks']; ?>" step="0.25"
-                                                               value="<?php echo isset($per_question[$q_number]) ? htmlspecialchars($per_question[$q_number]) : ''; ?>">
+                                                    <div class="col-12">
+                                                        <div class="question-input-group">
+                                                            <span class="question-label">Q<?php echo $q_number; ?></span>
+                                                            <input type="number"
+                                                                   class="form-control per-question-mark"
+                                                                   name="question_marks[<?php echo $q_number; ?>]"
+                                                                   min="0" max="<?php echo $part['marks']; ?>" step="0.25"
+                                                                   value="<?php echo isset($per_question[$q_number]) ? htmlspecialchars($per_question[$q_number]) : ''; ?>">
+                                                            <span class="marks-divider">/ <?php echo $part['marks']; ?></span>
+                                                        </div>
                                                     </div>
                                                 <?php endfor; ?>
                                             </div>
@@ -657,15 +943,18 @@ $pageTitle = "Evaluate Submission";
                                             <div class="mb-2">
                                                 <strong><?php echo $part['label']; ?>:</strong>
                                             </div>
-                                            <div class="row g-2 align-items-end mb-3">
+                                            <div class="row g-2 align-items-center mb-3">
                                                 <?php for ($j = 1; $j <= $part['count']; $j++, $q_number++): ?>
-                                                    <div class="col-6">
-                                                        <label class="form-label">Q<?php echo $q_number; ?> (out of <?php echo $part['marks']; ?>)</label>
-                                                        <input type="number"
-                                                               class="form-control per-question-mark"
-                                                               name="question_marks[<?php echo $q_number; ?>]"
-                                                               min="0" max="<?php echo $part['marks']; ?>" step="0.25"
-                                                               value="<?php echo isset($per_question[$q_number]) ? htmlspecialchars($per_question[$q_number]) : ''; ?>">
+                                                    <div class="col-12">
+                                                        <div class="question-input-group">
+                                                            <span class="question-label">Q<?php echo $q_number; ?></span>
+                                                            <input type="number"
+                                                                   class="form-control per-question-mark"
+                                                                   name="question_marks[<?php echo $q_number; ?>]"
+                                                                   min="0" max="<?php echo $part['marks']; ?>" step="0.25"
+                                                                   value="<?php echo isset($per_question[$q_number]) ? htmlspecialchars($per_question[$q_number]) : ''; ?>">
+                                                            <span class="marks-divider">/ <?php echo $part['marks']; ?></span>
+                                                        </div>
                                                     </div>
                                                 <?php endfor; ?>
                                             </div>
@@ -690,15 +979,18 @@ $pageTitle = "Evaluate Submission";
                                             <div class="mb-2">
                                                 <strong><?php echo $part['label']; ?>:</strong>
                                             </div>
-                                            <div class="row g-2 align-items-end mb-3">
+                                            <div class="row g-2 align-items-center mb-3">
                                                 <?php for ($j = 1; $j <= $part['count']; $j++, $q_number++): ?>
-                                                    <div class="col-6">
-                                                        <label class="form-label">Q<?php echo $q_number; ?> (out of <?php echo $part['marks']; ?>)</label>
-                                                        <input type="number"
-                                                               class="form-control per-question-mark"
-                                                               name="question_marks[<?php echo $q_number; ?>]"
-                                                               min="0" max="<?php echo $part['marks']; ?>" step="0.25"
-                                                               value="<?php echo isset($per_question[$q_number]) ? htmlspecialchars($per_question[$q_number]) : ''; ?>">
+                                                    <div class="col-12">
+                                                        <div class="question-input-group">
+                                                            <span class="question-label">Q<?php echo $q_number; ?></span>
+                                                            <input type="number"
+                                                                   class="form-control per-question-mark"
+                                                                   name="question_marks[<?php echo $q_number; ?>]"
+                                                                   min="0" max="<?php echo $part['marks']; ?>" step="0.25"
+                                                                   value="<?php echo isset($per_question[$q_number]) ? htmlspecialchars($per_question[$q_number]) : ''; ?>">
+                                                            <span class="marks-divider">/ <?php echo $part['marks']; ?></span>
+                                                        </div>
                                                     </div>
                                                 <?php endfor; ?>
                                             </div>
@@ -723,15 +1015,18 @@ $pageTitle = "Evaluate Submission";
                                             <div class="mb-2">
                                                 <strong><?php echo $part['label']; ?>:</strong>
                                             </div>
-                                            <div class="row g-2 align-items-end mb-3">
+                                            <div class="row g-2 align-items-center mb-3">
                                                 <?php for ($j = 1; $j <= $part['count']; $j++, $q_number++): ?>
-                                                    <div class="col-6">
-                                                        <label class="form-label">Q<?php echo $q_number; ?> (out of <?php echo $part['marks']; ?>)</label>
-                                                        <input type="number"
-                                                               class="form-control per-question-mark"
-                                                               name="question_marks[<?php echo $q_number; ?>]"
-                                                               min="0" max="<?php echo $part['marks']; ?>" step="0.25"
-                                                               value="<?php echo isset($per_question[$q_number]) ? htmlspecialchars($per_question[$q_number]) : ''; ?>">
+                                                    <div class="col-12">
+                                                        <div class="question-input-group">
+                                                            <span class="question-label">Q<?php echo $q_number; ?></span>
+                                                            <input type="number"
+                                                                   class="form-control per-question-mark"
+                                                                   name="question_marks[<?php echo $q_number; ?>]"
+                                                                   min="0" max="<?php echo $part['marks']; ?>" step="0.25"
+                                                                   value="<?php echo isset($per_question[$q_number]) ? htmlspecialchars($per_question[$q_number]) : ''; ?>">
+                                                            <span class="marks-divider">/ <?php echo $part['marks']; ?></span>
+                                                        </div>
                                                     </div>
                                                 <?php endfor; ?>
                                             </div>
@@ -753,22 +1048,25 @@ $pageTitle = "Evaluate Submission";
                                         $q_max = $template['max'];
                                     ?>
                                     <div class="mb-3">
-                                        <div class="row g-2 align-items-end">
+                                        <div class="row g-2 align-items-center">
                                             <?php for ($i = 1; $i <= $q_count; $i++): ?>
-                                            <div class="col-6">
-                                                <label class="form-label">Q<?php echo $i; ?> (out of <?php echo $q_max; ?>)</label>
-                                                <input type="number"
-                                                       class="form-control per-question-mark"
-                                                       name="question_marks[<?php echo $i; ?>]"
-                                                       min="0" max="<?php echo $q_max; ?>" step="0.25"
-                                                       value="<?php echo isset($per_question[$i]) ? htmlspecialchars($per_question[$i]) : ''; ?>">
+                                            <div class="col-12">
+                                                <div class="question-input-group">
+                                                    <span class="question-label">Q<?php echo $i; ?></span>
+                                                    <input type="number"
+                                                           class="form-control per-question-mark"
+                                                           name="question_marks[<?php echo $i; ?>]"
+                                                           min="0" max="<?php echo $q_max; ?>" step="0.25"
+                                                           value="<?php echo isset($per_question[$i]) ? htmlspecialchars($per_question[$i]) : ''; ?>">
+                                                    <span class="marks-divider">/ <?php echo $q_max; ?></span>
+                                                </div>
                                             </div>
                                             <?php endfor; ?>
                                         </div>
                                     </div>
                                     <?php } ?>
-                                    <div class="row mb-3">
-                                        <div class="col-6">
+                                    <div class="mb-3">
+                                        <div class="mb-3">
                                             <label for="marks_obtained" class="form-label">
                                                 <strong>Marks Obtained</strong>
                                             </label>
@@ -782,7 +1080,7 @@ $pageTitle = "Evaluate Submission";
                                                    value="<?php echo $submission['marks_obtained'] ?? ''; ?>"
                                                    required readonly>
                                         </div>
-                                        <div class="col-6">
+                                        <div class="mb-3">
                                             <label for="max_marks" class="form-label">
                                                 <strong>Maximum Marks</strong>
                                             </label>
@@ -811,23 +1109,39 @@ $pageTitle = "Evaluate Submission";
                                               rows="6" 
                                               placeholder="Provide detailed feedback on the submission..."
                                               required><?php echo htmlspecialchars($submission['evaluator_remarks'] ?? ''); ?></textarea>
+                                    
+                                    <!-- Feedback Suggestions -->
+                                    <div class="mt-2">
+                                        <small class="text-muted d-block text-center mb-2"><i class="fas fa-lightbulb me-1"></i>Quick Feedback Suggestions:</small>
+                                        <div class="feedback-buttons-container">
+                                            <button type="button" class="btn btn-outline-secondary btn-sm feedback-suggestion" data-feedback="Excellent work! Your answers demonstrate a clear understanding of the concepts.">
+                                                Excellent
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm feedback-suggestion" data-feedback="Good effort! Keep up the consistent work.">
+                                                Good
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm feedback-suggestion" data-feedback="Well done! Your presentation is neat and organized.">
+                                                Well Done
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm feedback-suggestion" data-feedback="Please review the concepts and provide more detailed answers.">
+                                                Needs Improvement
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm feedback-suggestion" data-feedback="Pay attention to handwriting and presentation. Make sure all answers are legible.">
+                                                Handwriting
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm feedback-suggestion" data-feedback="Focus on time management. Some questions appear incomplete or rushed.">
+                                                Time Management
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <!-- Annotated PDF Upload -->
                                 <div class="mb-4">
                                     <label for="annotated_pdf" class="form-label">
-                                        <strong><i class="fas fa-file-pdf me-2"></i>Upload Annotated PDF (Optional)</strong>
+                                        <strong><i class="fas fa-file-pdf me-2"></i>Upload Annotated PDF</strong>
                                     </label>
-                                    <div class="alert alert-info small mb-2">
-                                        <i class="fas fa-info-circle me-1"></i>
-                                        <strong>How to upload:</strong>
-                                        <ol class="mb-0 mt-1 small">
-                                            <li>Download the student's PDF above</li>
-                                            <li>Annotate it using Adobe Acrobat, Foxit, or any PDF editor</li>
-                                            <li>Upload the annotated version here</li>
-                                            <li>Student will see your annotations after submission</li>
-                                        </ol>
-                                    </div>
+                                    
                                     <div class="input-group">
                                         <input type="file" 
                                                class="form-control" 
@@ -939,45 +1253,97 @@ $pageTitle = "Evaluate Submission";
             updateTotalMarks();
         });
         
-        // Form validation
+        // Form validation - SIMPLIFIED VERSION
+        // Just validate question marks are filled, then let form submit normally
         document.getElementById('evaluationForm').addEventListener('submit', function(e) {
             const marksObtained = parseFloat(document.getElementById('marks_obtained').value);
             const maxMarks = parseFloat(document.getElementById('max_marks').value);
             const remarks = document.getElementById('evaluator_remarks').value.trim();
             
+            // Check if question marks are filled
+            const questionMarks = document.querySelectorAll('.per-question-mark');
+            let hasQuestionMarks = false;
+            let totalQuestionMarks = 0;
+            
+            questionMarks.forEach(function(input) {
+                const value = parseFloat(input.value) || 0;
+                if (value > 0) {
+                    hasQuestionMarks = true;
+                }
+                totalQuestionMarks += value;
+            });
+            
+            // Validate question marks are mandatory
+            if (!hasQuestionMarks || totalQuestionMarks === 0) {
+                e.preventDefault();
+                
+                // Add visual highlight
+                questionMarks.forEach(function(input) {
+                    input.classList.add('highlight-required');
+                });
+                
+                setTimeout(function() {
+                    questionMarks.forEach(function(input) {
+                        input.classList.remove('highlight-required');
+                    });
+                }, 1500);
+                
+                alert('⚠️ Question-wise marks are mandatory!\n\nPlease fill in the marks for each question before submitting.');
+                if (questionMarks.length > 0) {
+                    questionMarks[0].focus();
+                    questionMarks[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                return false;
+            }
+            
+            // Validate other fields
             if (isNaN(marksObtained) || marksObtained < 0) {
                 e.preventDefault();
                 alert('Please enter valid marks obtained (must be 0 or greater).');
-                return;
+                return false;
             }
             
             if (isNaN(maxMarks) || maxMarks <= 0) {
                 e.preventDefault();
                 alert('Please enter valid maximum marks (must be greater than 0).');
-                return;
+                return false;
             }
             
             if (marksObtained > maxMarks) {
                 e.preventDefault();
                 alert('Marks obtained cannot be greater than maximum marks.');
-                return;
+                return false;
             }
             
             if (remarks.length < 10) {
                 e.preventDefault();
                 alert('Please provide detailed evaluation comments (at least 10 characters).');
                 document.getElementById('evaluator_remarks').focus();
-                return;
+                return false;
             }
             
             // Final confirmation
             const percentage = ((marksObtained / maxMarks) * 100).toFixed(1);
-            const grade = document.getElementById('grade').textContent;
+            let grade = 'F';
+            if (percentage >= 90) grade = 'A+';
+            else if (percentage >= 85) grade = 'A';
+            else if (percentage >= 80) grade = 'A-';
+            else if (percentage >= 75) grade = 'B+';
+            else if (percentage >= 70) grade = 'B';
+            else if (percentage >= 65) grade = 'B-';
+            else if (percentage >= 60) grade = 'C+';
+            else if (percentage >= 55) grade = 'C';
+            else if (percentage >= 50) grade = 'C-';
+            else if (percentage >= 35) grade = 'D';
             
             if (!confirm(`Are you sure you want to submit this evaluation?\n\nMarks: ${marksObtained}/${maxMarks} (${percentage}%)\nGrade: ${grade}\n\nThis action cannot be undone.`)) {
                 e.preventDefault();
-                return;
+                return false;
             }
+            
+            // Let form submit normally - all question_marks[] inputs will be included in POST
+            console.log('Form validation passed, submitting normally...');
+            return true;
         });
         
         // Auto-save functionality (saves to localStorage for recovery)
@@ -1082,6 +1448,26 @@ $pageTitle = "Evaluate Submission";
                 return true;
             }
         }
+        
+        // Feedback suggestion buttons
+        document.querySelectorAll('.feedback-suggestion').forEach(function(button) {
+            button.addEventListener('click', function() {
+                const feedback = this.getAttribute('data-feedback');
+                const textarea = document.getElementById('evaluator_remarks');
+                const currentText = textarea.value.trim();
+                
+                // If textarea is empty, set the feedback directly
+                if (currentText === '') {
+                    textarea.value = feedback;
+                } else {
+                    // If there's existing text, append with a space
+                    textarea.value = currentText + ' ' + feedback;
+                }
+                
+                // Focus on textarea
+                textarea.focus();
+            });
+        });
         
         // Keyboard shortcuts
         document.addEventListener('keydown', function(e) {

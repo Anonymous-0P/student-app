@@ -282,7 +282,7 @@ header('Expires: 0');
                 </div>
                 <div class="col-auto">
                     <a href="dashboard.php" class="btn btn-light btn-sm">
-                        <i class="fas fa-arrow-left me-1"></i> Back to Papers
+                        <i class="fas fa-arrow-left me-1"></i> Go Back
                     </a>
                 </div>
             </div>

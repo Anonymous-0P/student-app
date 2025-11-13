@@ -263,9 +263,14 @@ include('../includes/header.php');
                     <h1 class="h3 mb-1"><i class="fas fa-book text-primary"></i> Subject Management</h1>
                     <p class="text-muted mb-0">Manage academic subjects and courses</p>
                 </div>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#subjectModal" onclick="resetForm()">
-                    <i class="fas fa-plus"></i> Add Subject
-                </button>
+                <div class="d-flex gap-2">
+                    <a href="subject_bundles.php" class="btn btn-success">
+                        <i class="fas fa-layer-group"></i> Manage Bundles
+                    </a>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#subjectModal" onclick="resetForm()">
+                        <i class="fas fa-plus"></i> Add Subject
+                    </button>
+                </div>
             </div>
 
             <!-- Statistics Cards -->
@@ -397,19 +402,25 @@ include('../includes/header.php');
 
             <!-- Subjects Table -->
             <div class="dashboard-card">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list"></i> Subjects List
+                        <small class="text-muted">(<?= $subjects ? $subjects->num_rows : 0 ?> found)</small>
+                    </h5>
+                </div>
+                
                 <div>
                     <?php if($subjects && $subjects->num_rows > 0): ?>
                         <div class="table-responsive">
-                            <table class="table table-hover">
+                            <table class="table table-hover align-middle">
                                 <thead class="table-light">
-                                    <tr>
+                                    <tr class="text-center">
                                         <th>Subject Code</th>
                                         <th>Subject Name</th>
                                         <th>Grade Level</th>
                                         <th>Price</th>
                                         <th>Duration</th>
                                         <th>Assignments</th>
-                                        <th>Questions</th>
                                         <th>Status</th>
                                         <th>Actions</th>
                                     </tr>
@@ -417,49 +428,49 @@ include('../includes/header.php');
                                 <tbody>
                                     <?php while($subject = $subjects->fetch_assoc()): ?>
                                     <tr>
-                                        <td>
-                                            <div class="fw-bold text-primary"><?= htmlspecialchars($subject['code']) ?></div>
+                                        <td class="text-center">
+                                            <span class="badge bg-primary" style="font-size: 0.875rem;"><?= htmlspecialchars($subject['code']) ?></span>
                                         </td>
                                         <td>
                                             <div class="fw-semibold"><?= htmlspecialchars($subject['name']) ?></div>
+                                            <?php if($subject['description']): ?>
+                                                <small class="text-muted d-block" style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                                    <?= htmlspecialchars($subject['description']) ?>
+                                                </small>
+                                            <?php endif; ?>
                                         </td>
-                                        <td>
+                                        <td class="text-center">
                                             <?php if($subject['department']): ?>
-                                                <span class="badge bg-primary"><?= htmlspecialchars($subject['department']) ?></span>
+                                                <span class="badge bg-info"><?= htmlspecialchars($subject['department']) ?></span>
                                             <?php else: ?>
-                                                <span class="text-muted">Not assigned</span>
+                                                <span class="text-muted small">Not assigned</span>
                                             <?php endif; ?>
                                         </td>
-                                        <td>
-                                            <div class="fw-semibold text-success">
-                                                                        <td>
-                            <div class="fw-semibold text-success">
-                                ₹<?= number_format($subject['price'] ?? 0, 2) ?>
-                            </div>
-                        </td>
+                                        <td class="text-center">
+                                            <span class="fw-semibold text-success">₹<?= number_format($subject['price'] ?? 0, 2) ?></span>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge bg-secondary"><?= $subject['duration_days'] ?? 365 ?> days</span>
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="d-flex gap-1 justify-content-center">
+                                                <span class="badge bg-primary" title="Moderators">
+                                                    <i class="fas fa-user-tie"></i> <?= $subject['moderator_count'] ?>
+                                                </span>
+                                                <span class="badge bg-success" title="Evaluators">
+                                                    <i class="fas fa-user-check"></i> <?= $subject['evaluator_count'] ?>
+                                                </span>
                                             </div>
                                         </td>
-                                        <td>
-                                            <span class="text-muted"><?= $subject['duration_days'] ?? 365 ?> days</span>
-                                        </td>
-                                        <td>
-                                            <div>
-                                                <span class="badge bg-primary"><?= $subject['moderator_count'] ?> Moderators</span>
-                                                <span class="badge bg-success"><?= $subject['evaluator_count'] ?> Evaluators</span>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-warning"><?= $subject['questions_count'] ?> Questions</span>
-                                        </td>
-                                        <td>
+                                        <td class="text-center">
                                             <?php if($subject['is_active']): ?>
-                                                <span class="badge bg-success">Active</span>
+                                                <span class="badge bg-success"><i class="fas fa-check-circle"></i> Active</span>
                                             <?php else: ?>
-                                                <span class="badge bg-danger">Inactive</span>
+                                                <span class="badge bg-danger"><i class="fas fa-times-circle"></i> Inactive</span>
                                             <?php endif; ?>
                                         </td>
-                                        <td>
-                                            <div class="btn-group" role="group">
+                                        <td class="text-center">
+                                            <div class="d-flex gap-1 justify-content-center">
                                                 <button class="btn btn-sm btn-outline-primary" 
                                                         onclick="editSubject(<?= $subject['id'] ?>)" 
                                                         title="Edit Subject">

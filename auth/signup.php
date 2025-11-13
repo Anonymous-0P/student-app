@@ -41,9 +41,18 @@ if(isset($_POST['signup'])){
                 } else {
                     $stmt->bind_param("sssssss", $name, $email, $password, $role, $phone, $college_name, $division);
                     if($stmt->execute()){
-                        $success = "Student account created successfully! You can now login.";
+                        // Send welcome email
+                        require_once('../includes/mail_helper.php');
+                        $emailResult = sendWelcomeEmail($email, $name, 'Student');
+                        
+                        if ($emailResult['success']) {
+                            $success = "Student account created successfully! A welcome email has been sent to your email address. You can now login.";
+                        } else {
+                            $success = "Student account created successfully! You can now login. (Note: Welcome email could not be sent)";
+                        }
+                        
                         // Optional: Auto redirect after a delay
-                        header("refresh:2;url=login.php");
+                        header("refresh:3;url=login.php");
                     } else {
                         $error = "Error creating account: " . $conn->error;
                     }
@@ -80,7 +89,7 @@ if(isset($_POST['signup'])){
                     <input type="text" name="college_name" class="form-control" placeholder="XYZ University" required value="<?= isset($_POST['college_name']) ? htmlspecialchars($_POST['college_name']) : '' ?>">
                 </div>
                 <div class="col-12">
-                    <label class="form-label">Division <span class="text-danger">*</span></label>
+                    <label class="form-label">Grade <span class="text-danger">*</span></label>
                     <select name="division" class="form-select" required>
                         <option value="">Select Division</option>
                         <option value="10th" <?= (isset($_POST['division']) && $_POST['division'] == '10th') ? 'selected' : '' ?>>10th Standard (State Board)</option>

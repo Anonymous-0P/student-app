@@ -109,6 +109,31 @@ if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
                         'purchase_date' => date('Y-m-d H:i:s')
                     ];
                     
+                    // Send purchase confirmation email with invoice
+                    require_once('../includes/mail_helper.php');
+                    $userStmt = $conn->prepare("SELECT name, email FROM users WHERE id = ?");
+                    $userStmt->bind_param("i", $student_id);
+                    $userStmt->execute();
+                    $userInfo = $userStmt->get_result()->fetch_assoc();
+                    
+                    if ($userInfo) {
+                        // Generate invoice PDF
+                        $invoicePath = generateInvoicePDF($payment_id, $userInfo, $items, $total, $_POST);
+                        
+                        // Send email with invoice attachment
+                        $emailResult = sendPurchaseConfirmationEmail(
+                            $userInfo['email'],
+                            $userInfo['name'],
+                            $payment_id,
+                            $items,
+                            $total,
+                            $invoicePath
+                        );
+                        
+                        // Store email result in session for debugging (optional)
+                        $_SESSION['email_sent'] = $emailResult['success'];
+                    }
+                    
                 } else {
                     throw new Exception($payment_status['error']);
                 }

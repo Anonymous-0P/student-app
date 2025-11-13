@@ -1,11 +1,10 @@
 <?php
 include('../config/config.php');
-include('../includes/header.php');
 require_once('../includes/functions.php');
 
 checkLogin('admin');
 
-// Handle AJAX request for evaluator data
+// Handle AJAX request for evaluator data (before any output)
 if(isset($_GET['action']) && $_GET['action'] == 'get_evaluator' && isset($_GET['id'])) {
     $user_id = (int)$_GET['id'];
     $stmt = $conn->prepare("SELECT * FROM users WHERE id = ? AND role = 'evaluator'");
@@ -46,6 +45,8 @@ if(isset($_GET['action']) && $_GET['action'] == 'get_evaluator' && isset($_GET['
     }
     exit;
 }
+
+include('../includes/header.php');
 
 // Handle evaluator creation
 if(isset($_POST['create_evaluator'])) {
@@ -682,7 +683,7 @@ $moderators = $conn->query("SELECT id, name FROM users WHERE role = 'moderator' 
                     <div class="table-responsive">
                         <table class="table table-hover">
                             <thead class="table-light">
-                                <tr>
+                                <tr class="text-center">
                                     <th>Evaluator Info</th>
                                     <th>Assign Subjects</th>
                                     <th>Moderator</th>

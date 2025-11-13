@@ -1,0 +1,103 @@
+
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset='UTF-8'>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 40px; }
+                .invoice-header { text-align: center; margin-bottom: 30px; border-bottom: 3px solid #667eea; padding-bottom: 20px; }
+                .invoice-title { color: #667eea; font-size: 32px; margin: 0; }
+                .company-name { color: #764ba2; font-size: 24px; margin: 10px 0; }
+                .invoice-info { margin: 30px 0; }
+                .info-section { margin-bottom: 20px; }
+                .info-section h3 { color: #667eea; margin-bottom: 10px; border-bottom: 2px solid #667eea; padding-bottom: 5px; }
+                .invoice-table { width: 100%; border-collapse: collapse; margin: 30px 0; }
+                .invoice-table th { background: #667eea; color: white; padding: 12px; text-align: left; }
+                .invoice-table td { padding: 10px; border-bottom: 1px solid #ddd; }
+                .total-row { background: #f0f4ff; font-weight: bold; font-size: 18px; }
+                .footer { margin-top: 50px; text-align: center; color: #666; border-top: 1px solid #ddd; padding-top: 20px; }
+                .status-badge { background: #10b981; color: white; padding: 5px 15px; border-radius: 15px; font-size: 12px; }
+            </style>
+        </head>
+        <body>
+            <div class='invoice-header'>
+                <div class='company-name'>ThetaExams</div>
+                <div class='invoice-title'>INVOICE</div>
+                <div style='margin-top: 10px; color: #666;'>Tax Invoice</div>
+            </div>
+            
+            <div class='invoice-info'>
+                <table style='width: 100%; margin-bottom: 30px;'>
+                    <tr>
+                        <td style='width: 50%; vertical-align: top;'>
+                            <div class='info-section'>
+                                <h3>Invoice To:</h3>
+                                <strong>Prakash Karekar</strong><br>
+                                prakashkarekar4@gmail.com<br>
+                                Prakash Karekar
+                            </div>
+                        </td>
+                        <td style='width: 50%; vertical-align: top; text-align: right;'>
+                            <div class='info-section'>
+                                <h3>Invoice Details:</h3>
+                                <strong>Invoice #:</strong> PAY_6908b88869590_1762179208<br>
+                                <strong>Date:</strong> 03 Nov 2025<br>
+                                <strong>Time:</strong> 02:13 PM<br>
+                                <strong>Status:</strong> <span class='status-badge'>PAID</span>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            
+            <table class='invoice-table'>
+                <thead>
+                    <tr>
+                        <th>Description</th>
+                        <th style='text-align: center;'>Duration</th>
+                        <th style='text-align: right;'>Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                <tr>
+                    <td style='padding: 10px; border-bottom: 1px solid #ddd;'>English Second Lang<br><small style='color: #666;'>Code: ENG_10TH</small></td>
+                    <td style='padding: 10px; border-bottom: 1px solid #ddd; text-align: center;'>365 days</td>
+                    <td style='padding: 10px; border-bottom: 1px solid #ddd; text-align: right;'>₹100.00</td>
+                </tr>
+            
+                <tr>
+                    <td style='padding: 10px; border-bottom: 1px solid #ddd;'>Mathematics (ENG)<br><small style='color: #666;'>Code: EMA_10TH</small></td>
+                    <td style='padding: 10px; border-bottom: 1px solid #ddd; text-align: center;'>365 days</td>
+                    <td style='padding: 10px; border-bottom: 1px solid #ddd; text-align: right;'>₹100.00</td>
+                </tr>
+            
+                </tbody>
+                <tfoot>
+                    <tr class='total-row'>
+                        <td colspan='2' style='padding: 15px;'>Total Amount</td>
+                        <td style='padding: 15px; text-align: right;'>₹200.00</td>
+                    </tr>
+                </tfoot>
+            </table>
+            
+            <div style='margin-top: 40px; padding: 20px; background: #f9f9f9; border-radius: 8px;'>
+                <h3 style='color: #667eea; margin-top: 0;'>Payment Information</h3>
+                <p><strong>Payment Method:</strong> Credit/Debit Card</p>
+                <p><strong>Transaction ID:</strong> PAY_6908b88869590_1762179208</p>
+                <p><strong>Payment Status:</strong> <span style='color: #10b981; font-weight: bold;'>✓ Completed</span></p>
+            </div>
+            
+            <div style='margin-top: 30px; padding: 15px; background: #e0e7ff; border-left: 4px solid #667eea; border-radius: 4px;'>
+                <strong>Note:</strong> This is a computer-generated invoice and does not require a signature. 
+                All purchased exam papers are now accessible from your dashboard.
+            </div>
+            
+            <div class='footer'>
+                <p><strong>ThetaExams - Your Gateway to Excellence</strong></p>
+                <p style='font-size: 12px; color: #999;'>Thank you for choosing ThetaExams!</p>
+                <p style='font-size: 12px; color: #999;'>&copy; 2025 ThetaExams. All rights reserved.</p>
+            </div>
+        </body>
+        </html>
+        

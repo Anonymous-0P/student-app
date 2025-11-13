@@ -19,9 +19,21 @@ if(isset($_POST['upload'])){
     if(!verify_csrf_token($_POST['csrf_token'] ?? '')) {
         $upload_error = 'Invalid CSRF token.';
     } else {
-        if(!isset($_FILES['images'])) {
+        // Enforce one submission per subject per student
+        $dupStmt = $conn->prepare("SELECT 1 FROM submissions WHERE student_id = ? AND subject_id = ? LIMIT 1");
+        if ($dupStmt) {
+            $dupStmt->bind_param("ii", $_SESSION['user_id'], $subject_id);
+            $dupStmt->execute();
+            $dupRes = $dupStmt->get_result();
+            if ($dupRes && $dupRes->num_rows > 0) {
+                $upload_error = 'You have already submitted for this subject. Only one submission allowed.';
+            }
+            $dupStmt->close();
+        }
+
+        if(!isset($upload_error) && !isset($_FILES['images'])) {
             $upload_error = 'No files uploaded.';
-        } else {
+        } elseif(!isset($upload_error)) {
             $files = $_FILES['images'];
             $count = count($files['tmp_name']);
             if ($count > $maxFiles) {

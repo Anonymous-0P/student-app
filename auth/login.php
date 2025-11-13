@@ -11,10 +11,50 @@ if(isset($_POST['login'])){
     $result = $stmt->get_result();
     if($result->num_rows == 1){
         $user = $result->fetch_assoc();
-        if(password_verify($password, $user['password'])){
+        
+        // Check if user account is active
+        if(isset($user['is_active']) && $user['is_active'] == 0){
+            $error = "Your account has been deactivated. Please contact the administrator.";
+        } elseif(password_verify($password, $user['password'])){
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['role'] = $user['role'];
             $_SESSION['name'] = $user['name'];
+            
+            // For students, restore guest cart if exists
+            if($user['role'] === 'student' && !empty($_SESSION['guest_cart'])) {
+                $student_id = $user['id'];
+                
+                // Move session cart items to database
+                foreach($_SESSION['guest_cart'] as $cart_item) {
+                    $subject_id = $cart_item['subject_id'];
+                    $price = $cart_item['price'];
+                    
+                    // Check if not already purchased
+                    $purchased_check = $conn->prepare("SELECT id FROM purchased_subjects WHERE student_id = ? AND subject_id = ? AND status = 'active'");
+                    $purchased_check->bind_param("ii", $student_id, $subject_id);
+                    $purchased_check->execute();
+                    
+                    if ($purchased_check->get_result()->num_rows == 0) {
+                        // Add to database cart
+                        $cart_stmt = $conn->prepare("INSERT INTO cart (student_id, subject_id, price) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE price = VALUES(price), added_at = CURRENT_TIMESTAMP");
+                        $cart_stmt->bind_param("iid", $student_id, $subject_id, $price);
+                        $cart_stmt->execute();
+                    }
+                }
+                
+                // Clear guest cart
+                unset($_SESSION['guest_cart']);
+                
+                // Redirect to cart if items were restored
+                header("Location: ../student/cart.php?restored=1");
+                exit();
+            }
+            
+            // Check if there's a redirect parameter (from checkout/cart)
+            if (isset($_GET['redirect']) && $_GET['redirect'] === 'checkout') {
+                header("Location: ../student/checkout.php");
+                exit();
+            }
             
             // Redirect based on role (keep existing roles for existing users)
             switch($user['role']) {
@@ -58,6 +98,9 @@ if(isset($_POST['login'])){
                 <div>
                     <label class="form-label">Password</label>
                     <input type="password" name="password" class="form-control" placeholder="••••••••" required>
+                    <div class="text-end mt-1">
+                        <small><a href="forgot_password.php" class="text-decoration-none">Forgot Password?</a></small>
+                    </div>
                 </div>
                 <div class="d-grid">
                     <button type="submit" name="login" class="btn btn-primary btn-lg">Login to Dashboard</button>

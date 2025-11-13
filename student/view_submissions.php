@@ -1,41 +1,127 @@
 <?php
 include('../config/config.php');
+$isIndexPage = false;
 include('../includes/header.php');
+?>
 
+<link href="../moderator/css/moderator-style.css" rel="stylesheet">
+<style>
+/* Fix button hover styles */
+.btn-primary:hover,
+.btn-success:hover,
+.btn-info:hover,
+.btn-outline-primary:hover,
+.btn-outline-secondary:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.btn-primary:hover {
+    background-color: #0056b3 !important;
+    border-color: #0056b3 !important;
+    color: white !important;
+}
+
+.btn-success:hover {
+    background-color: #157347 !important;
+    border-color: #157347 !important;
+    color: white !important;
+}
+
+.btn-info:hover {
+    background-color: #0a86b3 !important;
+    border-color: #0a86b3 !important;
+    color: white !important;
+}
+
+.btn-outline-primary:hover {
+    background-color: #0d6efd !important;
+    border-color: #0d6efd !important;
+    color: white !important;
+}
+
+.btn-outline-secondary:hover {
+    background-color: #6c757d !important;
+    border-color: #6c757d !important;
+    color: white !important;
+}
+</style>
+
+<?php require_once('includes/sidebar.php'); ?>
+
+<div class="dashboard-layout">
+    <div class="main-content">
+
+<?php
 if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'student'){
     header("Location: ../auth/login.php");
     exit;
 }
 
-// Get submissions with subject details and evaluator information
-$stmt = $conn->prepare("SELECT s.*, sub.code as subject_code, sub.name as subject_name, 
-                       u.name as evaluator_name,
-                       CASE 
-                           WHEN s.evaluation_status = 'evaluated' AND s.marks_obtained IS NOT NULL THEN 'Evaluated'
-                           WHEN s.evaluation_status = 'under_review' THEN 'Under Review'
-                           WHEN s.status = 'pending' THEN 'Pending Review'
-                           WHEN s.status = 'approved' THEN 'Approved'
-                           WHEN s.status = 'rejected' THEN 'Rejected'
-                           ELSE 'Unknown'
-                       END as status_display,
-                       CASE WHEN s.max_marks > 0 THEN (s.marks_obtained/s.max_marks)*100 ELSE 0 END as percentage
-                       FROM submissions s 
-                       LEFT JOIN subjects sub ON s.subject_id = sub.id 
-                       LEFT JOIN users u ON s.evaluator_id = u.id
-                       WHERE s.student_id=? 
-                       ORDER BY s.created_at DESC");
-$stmt->bind_param("i", $_SESSION['user_id']);
-$stmt->execute();
-$result = $stmt->get_result();
+// Detect if publication column exists (migration may not yet be applied)
+$hasPublishColumn = false;
+$colCheck = $conn->query("SHOW COLUMNS FROM submissions LIKE 'is_published'");
+if ($colCheck && $colCheck->num_rows === 1) { $hasPublishColumn = true; }
+
+if ($hasPublishColumn) {
+    $query = "SELECT s.*, sub.code as subject_code, sub.name as subject_name, 
+                     u.name as evaluator_name,
+                     CASE 
+                         WHEN s.is_published = 1 AND s.marks_obtained IS NOT NULL THEN 'Published'
+                         WHEN s.evaluation_status = 'evaluated' THEN 'Awaiting Approval'
+                         WHEN s.evaluation_status = 'under_review' THEN 'Under Review'
+                         WHEN s.status = 'pending' THEN 'Pending Review'
+                         WHEN s.status = 'rejected' THEN 'Rejected'
+                         ELSE 'Unknown'
+                     END as status_display,
+                     CASE WHEN s.is_published = 1 AND s.max_marks > 0 THEN (s.marks_obtained/s.max_marks)*100 ELSE 0 END as percentage
+                     FROM submissions s 
+                     LEFT JOIN subjects sub ON s.subject_id = sub.id 
+                     LEFT JOIN users u ON s.evaluator_id = u.id
+                     WHERE s.student_id=? 
+                     ORDER BY s.created_at DESC";
+} else {
+    // Fallback query without is_published (treat evaluated as awaiting approval and hide marks)
+    $query = "SELECT s.*, sub.code as subject_code, sub.name as subject_name, 
+                     u.name as evaluator_name,
+                     CASE 
+                         WHEN s.evaluation_status = 'evaluated' AND s.marks_obtained IS NOT NULL THEN 'Awaiting Approval'
+                         WHEN s.evaluation_status = 'under_review' THEN 'Under Review'
+                         WHEN s.status = 'pending' THEN 'Pending Review'
+                         WHEN s.status = 'rejected' THEN 'Rejected'
+                         ELSE 'Unknown'
+                     END as status_display,
+                     0 as percentage,
+                     0 as is_published
+                     FROM submissions s 
+                     LEFT JOIN subjects sub ON s.subject_id = sub.id 
+                     LEFT JOIN users u ON s.evaluator_id = u.id
+                     WHERE s.student_id=? 
+                     ORDER BY s.created_at DESC";
+}
+
+$stmt = $conn->prepare($query);
+if(!$stmt){
+    // Show graceful error instead of fatal
+    echo '<div class="alert alert-danger m-3">Database error preparing submissions query: ' . htmlspecialchars($conn->error) . '<br>Run migration file <code>db/add_publish_gating_columns.sql</code> and refresh.</div>';
+    $result = new class {
+        public $num_rows = 0; public function fetch_assoc(){ return null; }
+    }; // empty result shim
+} else {
+    $stmt->bind_param("i", $_SESSION['user_id']);
+    $stmt->execute();
+    $result = $stmt->get_result();
+}
 ?>
 
-<div class="container-fluid px-3">
+<div class="container-fluid px-2 px-md-3">
     <div class="row">
         <div class="col-12">
             <div class="page-card">
                 <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center mb-3 gap-2">
-                    <h2 class="mb-0 fs-4 fs-sm-3">Your Submissions</h2>
-                    <a class="btn btn-primary d-flex align-items-center gap-2 w-100 w-sm-auto justify-content-center" href="upload.php">
+                    <h2 class="mb-0 fs-5 fs-md-4">Your Submissions</h2>
+                    <a class="btn btn-primary d-flex align-items-center gap-2 w-100 w-sm-auto justify-content-center py-2" href="upload.php">
                         <i class="fas fa-plus"></i>
                         <span>New Upload</span>
                     </a>
@@ -69,8 +155,8 @@ $result = $stmt->get_result();
                             <?php 
                             // Status badge styling
                             $statusClass = 'bg-warning';
-                            if($row['status_display'] == 'Evaluated') $statusClass = 'bg-success';
-                            if($row['status_display'] == 'Approved') $statusClass = 'bg-success';
+                            if($row['status_display'] == 'Published') $statusClass = 'bg-success';
+                            if($row['status_display'] == 'Awaiting Approval') $statusClass = 'bg-warning';
                             if($row['status_display'] == 'Rejected') $statusClass = 'bg-danger';
                             if($row['status_display'] == 'Under Review') $statusClass = 'bg-info';
                             
@@ -110,7 +196,7 @@ $result = $stmt->get_result();
                                     </span>
                                 </td>
                                 <td>
-                                    <?php if($row['marks_obtained'] !== null && $row['max_marks'] > 0): ?>
+                                    <?php if($row['is_published'] == 1 && $row['marks_obtained'] !== null && $row['max_marks'] > 0): ?>
                                         <div class="fw-bold text-success">
                                             <?= number_format((float)$row['marks_obtained'], 1) ?> / <?= number_format((float)$row['max_marks'], 1) ?>
                                         </div>
@@ -118,6 +204,8 @@ $result = $stmt->get_result();
                                             <span class="badge bg-primary"><?= number_format($percentage, 1) ?>%</span>
                                             <span class="badge bg-secondary ms-1">Grade: <?= $grade ?></span>
                                         </div>
+                                    <?php elseif($row['evaluation_status'] == 'evaluated'): ?>
+                                        <span class="text-muted">Awaiting Moderator Approval</span>
                                     <?php else: ?>
                                         <span class="text-muted">Not evaluated</span>
                                     <?php endif; ?>
@@ -140,18 +228,10 @@ $result = $stmt->get_result();
                                 </td>
                                 <td>
                                     <div class="d-flex gap-1">
-                                        <a href="<?= htmlspecialchars($viewUrl) ?>" target="_blank" 
+                                        <a href="<?= htmlspecialchars($viewUrl) ?>" 
                                            class="btn btn-sm btn-outline-primary" title="View PDF">
                                             📄 View
                                         </a>
-                                        <?php if(!empty($row['annotated_pdf_url']) && file_exists('../' . $row['annotated_pdf_url'])): ?>
-                                            <a href="../<?= htmlspecialchars($row['annotated_pdf_url']) ?>" 
-                                               target="_blank"
-                                               class="btn btn-sm btn-success" 
-                                               title="Download Annotated Answer Sheet">
-                                                ✓ Evaluated
-                                            </a>
-                                        <?php endif; ?>
                                         <?php if($row['evaluator_remarks']): ?>
                                             <button class="btn btn-sm btn-outline-info" 
                                                     onclick="showEvaluationFeedback('<?= htmlspecialchars(addslashes($row['evaluator_remarks'])) ?>', '<?= htmlspecialchars($row['subject_code']) ?>', '<?= number_format($percentage, 1) ?>%', '<?= $grade ?>')"
@@ -159,11 +239,11 @@ $result = $stmt->get_result();
                                                 💬 Feedback
                                             </button>
                                         <?php endif; ?>
-                                        <?php if($row['marks_obtained'] !== null): ?>
-                                            <button class="btn btn-sm btn-outline-success" 
-                                                    onclick="showDetailedResults(<?= htmlspecialchars(json_encode($row)) ?>)"
-                                                    title="View Detailed Results">
-                                                � Results
+                                        <?php if($row['is_published'] == 1 && $row['marks_obtained'] !== null && $row['status_display'] == 'Published'): ?>
+                                            <button class="btn btn-sm btn-outline-warning" 
+                                                    onclick="showRateEvaluator(<?= $row['id'] ?>, '<?= htmlspecialchars($row['subject_code']) ?>')"
+                                                    title="Rate Evaluator">
+                                                ⭐ Rate
                                             </button>
                                         <?php endif; ?>
                                     </div>
@@ -183,8 +263,8 @@ $result = $stmt->get_result();
                     while($row = $result->fetch_assoc()): 
                         // Status badge styling
                         $statusClass = 'bg-warning';
-                        if($row['status_display'] == 'Evaluated') $statusClass = 'bg-success';
-                        if($row['status_display'] == 'Approved') $statusClass = 'bg-success';
+                        if($row['status_display'] == 'Published') $statusClass = 'bg-success';
+                        if($row['status_display'] == 'Awaiting Approval') $statusClass = 'bg-warning';
                         if($row['status_display'] == 'Rejected') $statusClass = 'bg-danger';
                         if($row['status_display'] == 'Under Review') $statusClass = 'bg-info';
                         
@@ -203,80 +283,84 @@ $result = $stmt->get_result();
                             else $grade = 'F';
                         }
                     ?>
-                    <div class="card mb-3 shadow-sm">
-                        <div class="card-body">
+                    <div class="card mb-3 shadow-sm border-0">
+                        <div class="card-body p-3">
                             <!-- Subject Header -->
-                            <div class="d-flex justify-content-between align-items-start mb-3">
-                                <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div class="flex-grow-1 me-2">
                                     <?php if($row['subject_code']): ?>
-                                        <h5 class="card-title mb-1 text-primary"><?= htmlspecialchars($row['subject_code']) ?></h5>
+                                        <h6 class="card-title mb-1 text-primary fw-bold"><?= htmlspecialchars($row['subject_code']) ?></h6>
                                         <p class="text-muted small mb-0"><?= htmlspecialchars($row['subject_name']) ?></p>
                                     <?php else: ?>
-                                        <h5 class="card-title text-muted">No subject</h5>
+                                        <h6 class="card-title text-muted">No subject</h6>
                                     <?php endif; ?>
                                 </div>
-                                <span class="badge <?= $statusClass ?> text-white ms-2">
+                                <span class="badge <?= $statusClass ?> text-white">
                                     <?= htmlspecialchars($row['status_display']) ?>
                                 </span>
                             </div>
                             
                             <!-- Submission Info -->
-                            <div class="row g-2 mb-3">
+                            <div class="row g-2 mb-2">
                                 <div class="col-6">
-                                    <div class="d-flex align-items-center text-muted small">
-                                        <i class="fas fa-calendar-alt me-2"></i>
-                                        <div>
-                                            <div><?= date('M j, Y', strtotime($row['created_at'])) ?></div>
-                                            <div class="text-muted"><?= date('g:i A', strtotime($row['created_at'])) ?></div>
+                                    <div class="small">
+                                        <div class="text-muted mb-1">
+                                            <i class="fas fa-calendar-alt me-1"></i> Submitted
                                         </div>
+                                        <div class="fw-semibold"><?= date('M j, Y', strtotime($row['created_at'])) ?></div>
+                                        <div class="text-muted" style="font-size: 0.75rem;"><?= date('g:i A', strtotime($row['created_at'])) ?></div>
                                     </div>
                                 </div>
                                 <div class="col-6">
-                                    <?php if($row['evaluator_name']): ?>
-                                        <div class="d-flex align-items-center text-muted small">
-                                            <i class="fas fa-user-check me-2"></i>
-                                            <div>
-                                                <div class="fw-semibold"><?= htmlspecialchars($row['evaluator_name']) ?></div>
-                                                <?php if($row['evaluated_at']): ?>
-                                                    <div class="text-muted"><?= date('M j', strtotime($row['evaluated_at'])) ?></div>
-                                                <?php endif; ?>
-                                            </div>
+                                    <div class="small">
+                                        <div class="text-muted mb-1">
+                                            <i class="fas fa-user-check me-1"></i> Evaluator
                                         </div>
-                                    <?php else: ?>
-                                        <div class="d-flex align-items-center text-muted small">
-                                            <i class="fas fa-user-times me-2"></i>
-                                            <span>Not assigned</span>
-                                        </div>
-                                    <?php endif; ?>
+                                        <?php if($row['evaluator_name']): ?>
+                                            <div class="fw-semibold"><?= htmlspecialchars($row['evaluator_name']) ?></div>
+                                            <?php if($row['evaluated_at']): ?>
+                                                <div class="text-muted" style="font-size: 0.75rem;"><?= date('M j, Y', strtotime($row['evaluated_at'])) ?></div>
+                                            <?php endif; ?>
+                                        <?php else: ?>
+                                            <div class="text-muted">Not assigned</div>
+                                        <?php endif; ?>
+                                    </div>
                                 </div>
                             </div>
                             
                             <!-- Marks Section -->
-                            <?php if($row['marks_obtained'] !== null && $row['max_marks'] > 0): ?>
-                                <div class="bg-light rounded p-3 mb-3">
+                            <?php if($row['is_published'] == 1 && $row['marks_obtained'] !== null && $row['max_marks'] > 0): ?>
+                                <div class="bg-light rounded p-2 mb-2">
                                     <div class="row g-2 text-center">
                                         <div class="col-4">
-                                            <div class="fw-bold text-success fs-5">
+                                            <div class="fw-bold text-success" style="font-size: 1.25rem;">
                                                 <?= number_format((float)$row['marks_obtained'], 1) ?>
                                             </div>
-                                            <div class="small text-muted">Obtained</div>
+                                            <div class="small text-muted mobile-marks-label">Obtained</div>
                                         </div>
                                         <div class="col-4">
-                                            <div class="fw-bold text-info fs-5">
+                                            <div class="fw-bold text-info" style="font-size: 1.25rem;">
                                                 <?= number_format((float)$row['max_marks'], 1) ?>
                                             </div>
-                                            <div class="small text-muted">Total</div>
+                                            <div class="small text-muted mobile-marks-label">Total</div>
                                         </div>
                                         <div class="col-4">
-                                            <div class="fw-bold text-primary fs-5"><?= $grade ?></div>
-                                            <div class="small text-muted"><?= number_format($percentage, 1) ?>%</div>
+                                            <div class="fw-bold text-primary" style="font-size: 1.25rem;"><?= $grade ?></div>
+                                            <div class="small text-muted mobile-marks-label"><?= number_format($percentage, 1) ?>%</div>
                                         </div>
                                     </div>
                                 </div>
+                            <?php elseif($row['evaluation_status'] == 'evaluated'): ?>
+                                <div class="bg-light rounded p-2 mb-2 text-center">
+                                    <div class="text-muted small">
+                                        <i class="fas fa-hourglass-half me-1"></i>
+                                        Awaiting Moderator Approval
+                                    </div>
+                                </div>
                             <?php else: ?>
-                                <div class="bg-light rounded p-3 mb-3 text-center">
-                                    <div class="text-muted">
-                                        <i class="fas fa-clock me-2"></i>
+                                <div class="bg-light rounded p-2 mb-2 text-center">
+                                    <div class="text-muted small">
+                                        <i class="fas fa-clock me-1"></i>
                                         Not evaluated yet
                                     </div>
                                 </div>
@@ -284,34 +368,26 @@ $result = $stmt->get_result();
                             
                             <!-- Action Buttons -->
                             <div class="d-grid gap-2">
-                                <a href="<?= htmlspecialchars($viewUrl) ?>" target="_blank" 
+                                <a href="<?= htmlspecialchars($viewUrl) ?>"
                                    class="btn btn-outline-primary">
-                                    <i class="fas fa-file-pdf me-2"></i>View PDF
+                                    📄 View PDF
                                 </a>
                                 
-                                <?php if(!empty($row['annotated_pdf_url']) && file_exists('../' . $row['annotated_pdf_url'])): ?>
-                                    <a href="../<?= htmlspecialchars($row['annotated_pdf_url']) ?>" 
-                                       target="_blank"
-                                       class="btn btn-success">
-                                        <i class="fas fa-check-circle me-2"></i>Download Annotated Answer Sheet
-                                    </a>
-                                <?php endif; ?>
-                                
-                                <?php if($row['evaluator_remarks'] || $row['marks_obtained'] !== null): ?>
+                                <?php if($row['evaluator_remarks'] || ($row['is_published'] == 1 && $row['marks_obtained'] !== null)): ?>
                                     <div class="row g-2">
                                         <?php if($row['evaluator_remarks']): ?>
                                             <div class="col-6">
-                                                <button class="btn btn-outline-info w-100" 
+                                                <button class="btn btn-outline-info w-100 mobile-action-btn" 
                                                         onclick="showEvaluationFeedback('<?= htmlspecialchars(addslashes($row['evaluator_remarks'])) ?>', '<?= htmlspecialchars($row['subject_code']) ?>', '<?= number_format($percentage, 1) ?>%', '<?= $grade ?>')">
-                                                    <i class="fas fa-comment me-2"></i>Feedback
+                                                    💬 Feedback
                                                 </button>
                                             </div>
                                         <?php endif; ?>
-                                        <?php if($row['marks_obtained'] !== null): ?>
+                                        <?php if($row['is_published'] == 1 && $row['marks_obtained'] !== null && $row['status_display'] == 'Published'): ?>
                                             <div class="col-<?= $row['evaluator_remarks'] ? '6' : '12' ?>">
-                                                <button class="btn btn-outline-success w-100" 
-                                                        onclick="showDetailedResults(<?= htmlspecialchars(json_encode($row)) ?>)">
-                                                    <i class="fas fa-chart-bar me-2"></i>Results
+                                                <button class="btn btn-outline-warning w-100 mobile-action-btn" 
+                                                        onclick="showRateEvaluator(<?= $row['id'] ?>, '<?= htmlspecialchars($row['subject_code']) ?>')">
+                                                    ⭐ Rate
                                                 </button>
                                             </div>
                                         <?php endif; ?>
@@ -370,6 +446,67 @@ $result = $stmt->get_result();
         </div>
     </div>
 </div>
+
+<!-- Modal for rating evaluator -->
+<div class="modal fade" id="rateModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-star text-warning me-2"></i>Rate Evaluator
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center mb-4">
+                    <p class="text-muted mb-3">How would you rate the evaluation for <strong id="ratingSubject"></strong>?</p>
+                    <div class="rating-stars mb-3" id="ratingStars">
+                        <i class="fas fa-star star-icon" data-rating="1"></i>
+                        <i class="fas fa-star star-icon" data-rating="2"></i>
+                        <i class="fas fa-star star-icon" data-rating="3"></i>
+                        <i class="fas fa-star star-icon" data-rating="4"></i>
+                        <i class="fas fa-star star-icon" data-rating="5"></i>
+                    </div>
+                    <p class="text-muted small mb-0" id="ratingText">Click on a star to rate</p>
+                </div>
+                <div class="mb-3">
+                    <label for="ratingComment" class="form-label">Additional Comments (Optional)</label>
+                    <textarea class="form-control" id="ratingComment" rows="3" placeholder="Share your experience..."></textarea>
+                </div>
+                <input type="hidden" id="ratingSubmissionId">
+                <input type="hidden" id="selectedRating" value="0">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" onclick="submitRating()">
+                    <i class="fas fa-paper-plane me-2"></i>Submit Rating
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.rating-stars {
+    font-size: 2.5rem;
+    cursor: pointer;
+}
+
+.star-icon {
+    color: #ddd;
+    transition: color 0.2s ease;
+    margin: 0 0.25rem;
+}
+
+.star-icon:hover,
+.star-icon.active {
+    color: #ffc107;
+}
+
+.star-icon.active {
+    transform: scale(1.1);
+}
+</style>
 
 <script>
 function showEvaluationFeedback(feedback, subjectCode, percentage, grade) {
@@ -585,42 +722,279 @@ function showDetailedResults(submission) {
     document.getElementById('resultsContent').innerHTML = content;
     new bootstrap.Modal(document.getElementById('resultsModal')).show();
 }
+
+function showRateEvaluator(submissionId, subjectCode) {
+    document.getElementById('ratingSubmissionId').value = submissionId;
+    document.getElementById('ratingSubject').textContent = subjectCode;
+    document.getElementById('selectedRating').value = '0';
+    document.getElementById('ratingComment').value = '';
+    document.getElementById('ratingText').textContent = 'Click on a star to rate';
+    
+    // Reset stars
+    document.querySelectorAll('.star-icon').forEach(star => {
+        star.classList.remove('active');
+    });
+    
+    new bootstrap.Modal(document.getElementById('rateModal')).show();
+}
+
+// Star rating interaction
+document.addEventListener('DOMContentLoaded', function() {
+    const stars = document.querySelectorAll('.star-icon');
+    
+    stars.forEach(star => {
+        star.addEventListener('click', function() {
+            const rating = this.getAttribute('data-rating');
+            document.getElementById('selectedRating').value = rating;
+            
+            // Update star display
+            stars.forEach(s => {
+                const starRating = s.getAttribute('data-rating');
+                if (starRating <= rating) {
+                    s.classList.add('active');
+                } else {
+                    s.classList.remove('active');
+                }
+            });
+            
+            // Update text
+            const ratingTexts = {
+                '1': 'Poor - Not satisfied',
+                '2': 'Fair - Below expectations',
+                '3': 'Good - Satisfactory',
+                '4': 'Very Good - Above expectations',
+                '5': 'Excellent - Outstanding!'
+            };
+            document.getElementById('ratingText').textContent = ratingTexts[rating];
+        });
+        
+        // Hover effect
+        star.addEventListener('mouseenter', function() {
+            const rating = this.getAttribute('data-rating');
+            stars.forEach(s => {
+                const starRating = s.getAttribute('data-rating');
+                if (starRating <= rating) {
+                    s.style.color = '#ffc107';
+                }
+            });
+        });
+        
+        star.addEventListener('mouseleave', function() {
+            const selectedRating = document.getElementById('selectedRating').value;
+            stars.forEach(s => {
+                const starRating = s.getAttribute('data-rating');
+                if (starRating <= selectedRating) {
+                    s.style.color = '#ffc107';
+                } else {
+                    s.style.color = '#ddd';
+                }
+            });
+        });
+    });
+});
+
+function submitRating() {
+    const submissionId = document.getElementById('ratingSubmissionId').value;
+    const rating = document.getElementById('selectedRating').value;
+    const comment = document.getElementById('ratingComment').value;
+    
+    if (rating === '0') {
+        alert('Please select a rating before submitting.');
+        return;
+    }
+    
+    // Disable submit button
+    event.target.disabled = true;
+    event.target.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Submitting...';
+    
+    // Send rating via AJAX
+    fetch('submit_rating.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            submission_id: submissionId,
+            rating: rating,
+            comment: comment
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Thank you for your rating!');
+            bootstrap.Modal.getInstance(document.getElementById('rateModal')).hide();
+            // Optionally reload the page or update UI
+            location.reload();
+        } else {
+            alert('Error submitting rating: ' + (data.message || 'Unknown error'));
+            event.target.disabled = false;
+            event.target.innerHTML = '<i class="fas fa-paper-plane me-2"></i>Submit Rating';
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error submitting rating. Please try again.');
+        event.target.disabled = false;
+        event.target.innerHTML = '<i class="fas fa-paper-plane me-2"></i>Submit Rating';
+    });
+}
 </script>
 
 <style>
+/* Mobile action buttons styling */
+.mobile-action-btn {
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.875rem !important;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-width: 1px !important;
+    min-height: 38px;
+}
+
+/* Page card styling */
+.page-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+/* Mobile card improvements */
+.d-lg-none .card {
+    border-radius: 12px !important;
+    overflow: hidden;
+}
+
+.d-lg-none .card-body {
+    padding: 1rem !important;
+}
+
 /* Mobile-friendly enhancements */
-@media (max-width: 576px) {
+@media (max-width: 991.98px) {
+    /* Prevent horizontal overflow */
+    body {
+        overflow-x: hidden !important;
+    }
+    
+    .main-content {
+        overflow-x: hidden !important;
+        width: 100% !important;
+        max-width: 100vw !important;
+        box-sizing: border-box !important;
+        padding: 0.5rem !important;
+    }
+    
+    .container-fluid {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+    }
+    
     .page-card {
-        margin: 0 -15px;
-        border-radius: 0;
-        border-left: none;
-        border-right: none;
+        padding: 1rem !important;
+        margin-bottom: 1rem !important;
     }
     
-    .card-body {
-        padding: 1rem;
+    .page-card h2 {
+        font-size: 1.25rem !important;
     }
     
-    /* Better touch targets */
+    /* Mobile card layout */
+    .d-lg-none .card {
+        margin-bottom: 0.75rem !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+    }
+    
+    .d-lg-none .card-body {
+        padding: 1rem !important;
+    }
+    
+    .d-lg-none .card-title {
+        font-size: 1rem !important;
+        line-height: 1.3 !important;
+        margin-bottom: 0.25rem !important;
+    }
+    
+    /* Button improvements */
     .btn {
-        min-height: 44px;
-        padding: 0.75rem 1rem;
+        font-size: 0.9rem !important;
+        font-weight: 500 !important;
+        border-radius: 8px !important;
     }
     
-    .btn-sm {
-        min-height: 36px;
-        padding: 0.5rem 0.75rem;
+    .btn-primary {
+        padding: 0.75rem 1rem !important;
     }
     
-    /* Improve readability */
-    .card-title {
-        font-size: 1.1rem;
-        line-height: 1.3;
+    /* Mobile action buttons - specific override */
+    .mobile-action-btn {
+        padding: 0.75rem 0.5rem !important;
+        font-size: 0.85rem !important;
+        font-weight: 600 !important;
+        line-height: 1.4 !important;
+        min-height: 42px !important;
+        white-space: nowrap !important;
     }
     
+    /* Mobile marks labels - make text visible */
+    .mobile-marks-label {
+        font-size: 0.75rem !important;
+        white-space: nowrap !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+    }
+    
+    .mobile-action-btn i {
+        font-size: 0.85rem !important;
+    }
+    
+    /* View PDF button */
+    .btn-primary {
+        font-weight: 500 !important;
+    }
+    
+    /* Spacing adjustments */
+    .gap-2 {
+        gap: 0.5rem !important;
+    }
+    
+    .mb-2 {
+        margin-bottom: 0.5rem !important;
+    }
+    
+    .mb-3 {
+        margin-bottom: 0.75rem !important;
+    }
+    
+    /* Badge adjustments */
+    .badge {
+        font-size: 0.7rem !important;
+        padding: 0.35rem 0.5rem !important;
+        white-space: normal !important;
+    }
+    
+    /* Small text */
     .small {
-        font-size: 0.8rem;
+        font-size: 0.75rem !important;
     }
+    
+    /* Info sections */
+    .bg-light.rounded {
+        padding: 0.75rem !important;
+    }
+    
+    /* Ensure no element causes overflow */
+    * {
+        max-width: 100%;
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        box-sizing: border-box !important;
+    }
+}
     
     /* Modal improvements */
     .modal-dialog {
@@ -716,5 +1090,8 @@ function showDetailedResults(submission) {
     transform: none !important;
 }
 </style>
+
+    </div>
+</div>
 
 <?php include('../includes/footer.php'); ?>

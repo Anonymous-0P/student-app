@@ -25,6 +25,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 throw new Exception("Please fill in all required fields.");
             }
             
+            // Check if student has already submitted for this subject
+            // Strong duplicate check: block ANY previous submission for this subject
+            $check_duplicate_sql = "SELECT id FROM answer_sheets WHERE student_id = ? AND subject_id = ? LIMIT 1";
+            $check_stmt = $pdo->prepare($check_duplicate_sql);
+            $check_stmt->execute([$_SESSION['user_id'], $subject_id]);
+            if ($check_stmt->fetch()) {
+                throw new Exception("You have already submitted an answer sheet for this subject. Only one submission per subject is allowed.");
+            }
+            
             // Handle PDF upload
             $pdf_path = null;
             if (isset($_FILES['answer_sheet_pdf']) && $_FILES['answer_sheet_pdf']['error'] === UPLOAD_ERR_OK) {
@@ -134,6 +143,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             
             $pdo->commit();
             
+            // Send submission confirmation email to student
+            try {
+                $student_stmt = $pdo->prepare("SELECT name, email FROM users WHERE id = ?");
+                $student_stmt->execute([$_SESSION['user_id']]);
+                $student = $student_stmt->fetch(PDO::FETCH_ASSOC);
+                if ($student && $subject_info) {
+                    require_once('../includes/mail_helper.php');
+                    $emailRes = sendSubmissionReceivedEmail(
+                        $student['email'],
+                        $student['name'],
+                        $subject_info['code'],
+                        $subject_info['name'],
+                        'http://localhost/student-app/student/submission_status.php?id=' . $answer_sheet_id
+                    );
+                    if (!$emailRes['success']) {
+                        error_log('Submission email failed: ' . $emailRes['message']);
+                    }
+                }
+            } catch (Exception $e) {
+                // Do not block the flow on email errors
+                error_log('Error sending submission email: ' . $e->getMessage());
+            }
+            
             $_SESSION['success'] = "Answer sheet submitted successfully! Evaluators have been notified.";
             header("Location: submission_status.php?id=" . $answer_sheet_id);
             exit();
@@ -155,6 +187,12 @@ $subjects_sql = "SELECT DISTINCT s.* FROM subjects s
 $stmt = $pdo->prepare($subjects_sql);
 $stmt->execute([$_SESSION['user_id']]);
 $subjects = $stmt->fetchAll();
+
+// Get subjects that student has already submitted for
+$submitted_subjects_sql = "SELECT DISTINCT subject_id FROM answer_sheets WHERE student_id = ?";
+$submitted_stmt = $pdo->prepare($submitted_subjects_sql);
+$submitted_stmt->execute([$_SESSION['user_id']]);
+$submitted_subjects = $submitted_stmt->fetchAll(PDO::FETCH_COLUMN);
 
 // Get student's recent submissions
 $recent_submissions_sql = "SELECT as_main.*, s.name as subject_name, s.code as subject_code,
@@ -240,11 +278,19 @@ include '../includes/header.php';
                                     <select class="form-control" id="subject_id" name="subject_id" required>
                                         <option value="">Select Subject</option>
                                         <?php foreach ($subjects as $subject): ?>
-                                            <option value="<?= $subject['id'] ?>">
+                                            <?php 
+                                            $is_submitted = in_array($subject['id'], $submitted_subjects);
+                                            ?>
+                                            <option value="<?= $subject['id'] ?>" <?= $is_submitted ? 'disabled' : '' ?>>
                                                 <?= htmlspecialchars($subject['code']) ?> - <?= htmlspecialchars($subject['name']) ?>
+                                                <?= $is_submitted ? ' (Already Submitted)' : '' ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
+                                    <div class="form-text">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        You can only submit one answer sheet per subject
+                                    </div>
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -345,6 +391,10 @@ include '../includes/header.php';
                         <div class="mb-2">
                             <i class="fas fa-check text-success me-1"></i>
                             Submit within the deadline
+                        </div>
+                        <div class="mb-2">
+                            <i class="fas fa-exclamation-triangle text-danger me-1"></i>
+                            <strong>Only one submission per subject is allowed</strong>
                         </div>
                         <div class="mb-0">
                             <i class="fas fa-exclamation-triangle text-warning me-1"></i>

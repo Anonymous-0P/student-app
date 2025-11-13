@@ -2,57 +2,105 @@
 require_once('../config/config.php');
 require_once('../includes/functions.php');
 
-checkLogin('student');
+// Check if user is logged in
+$is_logged_in = isset($_SESSION['user_id']) && $_SESSION['role'] === 'student';
+$student_id = $is_logged_in ? $_SESSION['user_id'] : null;
 
-$student_id = $_SESSION['user_id'];
+// Initialize session cart if not exists
+if (!isset($_SESSION['guest_cart'])) {
+    $_SESSION['guest_cart'] = [];
+}
 
 // Handle cart updates
 if (isset($_POST['action'])) {
     if ($_POST['action'] === 'remove' && isset($_POST['subject_id'])) {
         $subject_id = (int)$_POST['subject_id'];
-        $stmt = $conn->prepare("DELETE FROM cart WHERE student_id = ? AND subject_id = ?");
-        $stmt->bind_param("ii", $student_id, $subject_id);
-        if ($stmt->execute()) {
-            $success = "Item removed from cart successfully!";
+        
+        if ($is_logged_in) {
+            $stmt = $conn->prepare("DELETE FROM cart WHERE student_id = ? AND subject_id = ?");
+            $stmt->bind_param("ii", $student_id, $subject_id);
+            if ($stmt->execute()) {
+                $success = "Item removed from cart successfully!";
+            } else {
+                $error = "Error removing item from cart.";
+            }
         } else {
-            $error = "Error removing item from cart.";
+            unset($_SESSION['guest_cart'][$subject_id]);
+            $success = "Item removed from cart successfully!";
         }
     } elseif ($_POST['action'] === 'clear') {
-        $stmt = $conn->prepare("DELETE FROM cart WHERE student_id = ?");
-        $stmt->bind_param("i", $student_id);
-        if ($stmt->execute()) {
-            $success = "Cart cleared successfully!";
+        if ($is_logged_in) {
+            $stmt = $conn->prepare("DELETE FROM cart WHERE student_id = ?");
+            $stmt->bind_param("i", $student_id);
+            if ($stmt->execute()) {
+                $success = "Cart cleared successfully!";
+            } else {
+                $error = "Error clearing cart.";
+            }
         } else {
-            $error = "Error clearing cart.";
+            $_SESSION['guest_cart'] = [];
+            $success = "Cart cleared successfully!";
         }
     }
 }
 
 // Get cart items
-$cart_query = "SELECT c.*, s.code, s.name, s.description, s.department, s.year, s.semester, s.duration_days
-               FROM cart c
-               JOIN subjects s ON c.subject_id = s.id
-               WHERE c.student_id = ?
-               ORDER BY c.added_at DESC";
-
-$cart_stmt = $conn->prepare($cart_query);
-$cart_stmt->bind_param("i", $student_id);
-$cart_stmt->execute();
-$cart_items = $cart_stmt->get_result();
-
-// Calculate total
-$total = 0;
 $items = [];
-while ($item = $cart_items->fetch_assoc()) {
-    $items[] = $item;
-    $total += $item['price'];
+$total = 0;
+
+if ($is_logged_in) {
+    // Get cart items from database for logged-in users
+    $cart_query = "SELECT c.*, s.code, s.name, s.description, s.department, s.year, s.semester, s.duration_days
+                   FROM cart c
+                   JOIN subjects s ON c.subject_id = s.id
+                   WHERE c.student_id = ?
+                   ORDER BY c.added_at DESC";
+
+    $cart_stmt = $conn->prepare($cart_query);
+    $cart_stmt->bind_param("i", $student_id);
+    $cart_stmt->execute();
+    $cart_items = $cart_stmt->get_result();
+
+    while ($item = $cart_items->fetch_assoc()) {
+        $items[] = $item;
+        $total += $item['price'];
+    }
+} else {
+    // Get cart items from session for guest users
+    if (!empty($_SESSION['guest_cart'])) {
+        $subject_ids = array_keys($_SESSION['guest_cart']);
+        if (!empty($subject_ids)) {
+            $placeholders = implode(',', array_fill(0, count($subject_ids), '?'));
+            $cart_query = "SELECT s.id as subject_id, s.code, s.name, s.description, s.department, s.year, s.semester, s.duration_days, s.price
+                           FROM subjects s
+                           WHERE s.id IN ($placeholders) AND s.is_active = 1";
+            
+            $cart_stmt = $conn->prepare($cart_query);
+            $types = str_repeat('i', count($subject_ids));
+            $cart_stmt->bind_param($types, ...$subject_ids);
+            $cart_stmt->execute();
+            $cart_result = $cart_stmt->get_result();
+            
+            while ($item = $cart_result->fetch_assoc()) {
+                $item['added_at'] = $_SESSION['guest_cart'][$item['subject_id']]['added_at'];
+                $items[] = $item;
+                $total += $item['price'];
+            }
+        }
+    }
 }
 
 $pageTitle = "Shopping Cart";
+$isIndexPage = false;
 require_once('../includes/header.php');
 ?>
 
 <link rel="stylesheet" href="../moderator/css/moderator-style.css">
+
+<?php require_once('includes/sidebar.php'); ?>
+
+<div class="dashboard-layout">
+    <div class="main-content">
 
 <style>
 /* Additional styles for cart */
@@ -107,10 +155,15 @@ require_once('../includes/header.php');
     padding: 3rem 1rem;
 }
 
-.empty-cart i {
+.empty-cart > i {
     font-size: 4rem;
     color: var(--text-muted);
     margin-bottom: 1rem;
+}
+
+.empty-cart .btn i {
+    font-size: 0.75rem;
+    margin-right: 0.5rem;
 }
 
 .summary-row {
@@ -166,11 +219,6 @@ require_once('../includes/header.php');
                     <h1><i class="fas fa-shopping-cart"></i> Shopping Cart</h1>
                     <p>Review your selected exams before checkout</p>
                 </div>
-                <div>
-                    <a href="browse_exams.php" class="btn btn-outline-secondary">
-                        <i class="fas fa-arrow-left"></i> Continue Shopping
-                    </a>
-                </div>
             </div>
         </div>
     </div>
@@ -178,6 +226,13 @@ require_once('../includes/header.php');
     <div class="container">
 
         <!-- Alerts -->
+        <?php if (isset($_GET['restored']) && $_GET['restored'] == '1'): ?>
+            <div class="alert alert-success alert-dismissible fade show">
+                <i class="fas fa-check-circle"></i> <strong>Welcome back!</strong> Your cart items have been restored.
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        <?php endif; ?>
+        
         <?php if (isset($success)): ?>
             <div class="alert alert-success alert-dismissible fade show">
                 <i class="fas fa-check-circle"></i> <?= htmlspecialchars($success) ?>
@@ -216,7 +271,7 @@ require_once('../includes/header.php');
                                         <p class="cart-item-description">
                                             <?= htmlspecialchars($item['description'] ?: 'No description available.') ?>
                                         </p>
-                                        <div class="cart-item-meta">
+                                        <!-- <div class="cart-item-meta">
                                             <span class="badge bg-secondary" style="background: #6b7280 !important; color: white !important;"><?= htmlspecialchars($item['department']) ?></span>
                                             <?php if ($item['year']): ?>
                                                 <span class="me-2">Year <?= $item['year'] ?></span>
@@ -225,7 +280,7 @@ require_once('../includes/header.php');
                                                 <span class="me-2">Sem <?= $item['semester'] ?></span>
                                             <?php endif; ?>
                                             <span><?= $item['duration_days'] ?> days access</span>
-                                        </div>
+                                        </div> -->
                                     </div>
                                     <div class="col-md-3 text-center">
                                         <div class="cart-price">₹<?= number_format($item['price'], 2) ?></div>
@@ -270,9 +325,15 @@ require_once('../includes/header.php');
                         </div>
                         
                         <div class="d-grid gap-2 mt-3">
-                            <a href="checkout.php" class="btn btn-primary">
-                                <i class="fas fa-credit-card"></i> Proceed to Checkout
-                            </a>
+                            <?php if ($is_logged_in): ?>
+                                <a href="checkout.php" class="btn btn-primary">
+                                    <i class="fas fa-credit-card"></i> Proceed to Checkout
+                                </a>
+                            <?php else: ?>
+                                <a href="../auth/login.php?redirect=checkout" class="btn btn-primary" onclick="sessionStorage.setItem('redirect_after_login', '../student/checkout.php');">
+                                    <i class="fas fa-sign-in-alt"></i> Login to Checkout
+                                </a>
+                            <?php endif; ?>
                             <a href="browse_exams.php" class="btn btn-outline-secondary">
                                 <i class="fas fa-plus"></i> Add More Items
                             </a>
@@ -299,13 +360,16 @@ require_once('../includes/header.php');
                         <i class="fas fa-shopping-cart"></i>
                         <h3>Your cart is empty</h3>
                         <p class="text-muted mb-4">Browse our collection of exam subjects and add them to your cart.</p>
-                        <a href="browse_exams.php" class="btn btn-primary btn-lg">
+                        <a href="browse_exams.php" class="btn btn-primary btn-sm">
                             <i class="fas fa-book-open"></i> Browse Exams
                         </a>
                     </div>
                 </div>
             </div>
         <?php endif; ?>
+    </div>
+</div>
+
     </div>
 </div>
 

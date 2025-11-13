@@ -256,9 +256,15 @@ $isStudentPage = strpos($currentPath, '/student/') !== false;
 $isAdminPage = strpos($currentPath, '/admin/') !== false;
 $isModeratorPage = strpos($currentPath, '/moderator/') !== false;
 $isEvaluatorPage = strpos($currentPath, '/evaluator/') !== false;
+$isAuthPage = strpos($currentPath, '/auth/') !== false;
 ?>
 
-<?php if ($isStudentPage): ?>
+<?php if ($isAuthPage): ?>
+/* Show all navbar items on auth pages (login/signup) */
+.navbar-nav .nav-item {
+    display: block !important;
+}
+<?php elseif ($isStudentPage): ?>
 /* Show dashboard, home, and logout for student pages */
 .navbar-nav .nav-item {
     display: none !important;
@@ -268,19 +274,36 @@ $isEvaluatorPage = strpos($currentPath, '/evaluator/') !== false;
 .navbar-nav .nav-item:has(a[href*="logout.php"]) {
     display: block !important;
 }
+<?php elseif ($isEvaluatorPage): ?>
+/* Show dashboard and logout for evaluator pages */
+.navbar-nav .nav-item {
+    display: none !important;
+}
+.navbar-nav .nav-item:has(a[href*="dashboard.php"]),
+.navbar-nav .nav-item:has(a[href*="assignments.php"]),
+.navbar-nav .nav-item:has(a[href*="logout.php"]) {
+    display: block !important;
+}
 <?php else: ?>
 /* Show only dashboard link for other roles */
 .navbar-nav .nav-item {
     display: none !important;
 }
-.navbar-nav .nav-item:has(a[href*="dashboard.php"]) {
+.navbar-nav .nav-item:has(a[href*="dashboard.php"]),
+.navbar-nav .nav-item:has(a[href*="logout.php"]) {
     display: block !important;
 }
 <?php endif; ?>
 
-/* Hide hamburger menu button */
+/* Show hamburger menu button on mobile only */
 .hamburger-btn {
     display: none !important;
+}
+
+@media (max-width: 991.98px) {
+    .hamburger-btn {
+        display: flex !important;
+    }
 }
 <?php endif; ?>
 
@@ -295,55 +318,61 @@ $isEvaluatorPage = strpos($currentPath, '/evaluator/') !== false;
         margin: 0.25rem 0 !important;
         text-align: left;
     }
+    
+    /* Fixed header on mobile - stays at top when scrolling */
+    header.navbar.navbar-enhanced {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        z-index: 1050 !important;
+        margin: 0 !important;
+    }
+    
+    /* Compensate for fixed header */
+    body {
+        padding-top: 56px;
+    }
+    
+    .dashboard-layout,
+    .browse-exams-content {
+        padding-top: 0;
+    }
 }
 </style>
 
 <header class="navbar navbar-expand-lg <?= $isIndexPage ? 'navbar-dark' : 'navbar-light' ?> navbar-enhanced shadow-sm">
     <div class="container">
+    <?php 
+    $isStudentPage = strpos($_SERVER['REQUEST_URI'], '/student/') !== false;
+    $isCheckoutPage = strpos($_SERVER['REQUEST_URI'], 'checkout.php') !== false;
+    $isPaymentSuccessPage = strpos($_SERVER['REQUEST_URI'], 'payment_success.php') !== false;
+    ?>
+    
+    <!-- Mobile Menu Toggle for Student Pages -->
+    <?php if ($isStudentPage && isset($_SESSION['role']) && $_SESSION['role'] == 'student' && !$isCheckoutPage && !$isPaymentSuccessPage): ?>
+        <button class="btn btn-link d-lg-none" type="button" id="mobileMenuToggle" style="padding: 0.5rem; margin-right: 0.5rem; color: inherit; text-decoration: none;">
+            <i class="fas fa-bars" style="font-size: 1.5rem;"></i>
+        </button>
+    <?php endif; ?>
+    
     <a class="navbar-brand navbar-brand-enhanced" href="<?= $baseUrl ?>index.php">
         <?php if (!$isIndexPage): ?>
             <i class="fas fa-graduation-cap me-2"></i>
-            <?php 
-            if (isset($_SESSION['role'])) {
-                switch ($_SESSION['role']) {
-                    case 'student':
-                        echo 'Student Panel';
-                        break;
-                    case 'moderator':
-                        echo 'Moderator Panel';
-                        break;
-                    case 'evaluator':
-                        echo 'Evaluator Panel';
-                        break;
-                    case 'admin':
-                        echo 'Admin Panel';
-                        break;
-                    default:
-                        echo 'Admin Panel';
-                }
-            } else {
-                echo 'Admin Panel';
-            }
-            ?>
-        <?php else: ?>ThetaExams<?php endif; ?>
+        <?php endif; ?>
+        ThetaExams
     </a>
+        <?php if (!$isPaymentSuccessPage): ?>
         <button class="navbar-toggler navbar-toggler-enhanced" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
+        <?php endif; ?>
         <div class="collapse navbar-collapse" id="mainNav">
             <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
                 <?php if(isset($_SESSION['role'])): ?>
                     <?php if($_SESSION['role'] == 'student'): ?>
-                        <li class="nav-item">
-                            <a class="nav-link nav-link-enhanced <?= (strpos($_SERVER['REQUEST_URI'], 'student/dashboard') !== false) ? 'active' : '' ?>" href="<?= $baseUrl ?>student/dashboard.php">
-                                <i class="fas fa-tachometer-alt"></i> Dashboard
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link nav-link-enhanced <?= (basename($_SERVER['PHP_SELF']) == 'index.php') ? 'active' : '' ?>" href="<?= $baseUrl ?>index.php">
-                                <i class="fas fa-home"></i> Home
-                            </a>
-                        </li>
+                        <!-- Student navigation handled by sidebar -->
                     <?php elseif($_SESSION['role'] == 'admin'): ?>
                         <li class="nav-item">
                             <a class="nav-link nav-link-enhanced <?= (strpos($_SERVER['REQUEST_URI'], 'admin/dashboard') !== false) ? 'active' : '' ?>" href="<?= $baseUrl ?>admin/dashboard.php">
@@ -363,12 +392,19 @@ $isEvaluatorPage = strpos($currentPath, '/evaluator/') !== false;
                             </a>
                         </li>
                     <?php endif; ?>
+                    <?php if($_SESSION['role'] != 'student'): ?>
                     <li class="nav-item">
                         <a class="nav-link nav-link-enhanced" href="<?= $baseUrl ?>auth/logout.php" onclick="return confirm('Are you sure you want to logout?')">
                             <i class="fas fa-sign-out-alt"></i> Logout
                         </a>
                     </li>
+                    <?php endif; ?>
                 <?php else: ?>
+                    <li class="nav-item">
+                        <a class="nav-link nav-link-enhanced <?= (basename($_SERVER['PHP_SELF']) == 'index.php') ? 'active' : '' ?>" href="<?= $baseUrl ?>index.php">
+                            <i class="fas fa-home"></i> Home
+                        </a>
+                    </li>
                     <li class="nav-item">
                         <a class="nav-link nav-link-enhanced <?= (strpos($_SERVER['REQUEST_URI'], 'login') !== false) ? 'active' : '' ?>" href="<?= $baseUrl ?>auth/login.php">
                             <i class="fas fa-sign-in-alt"></i> Login
@@ -381,12 +417,16 @@ $isEvaluatorPage = strpos($currentPath, '/evaluator/') !== false;
                     </li>
                 <?php endif; ?>
             </ul>
-            <?php if (!empty($userRole)): ?>
-            <button class="hamburger-btn ms-3" type="button" data-bs-toggle="offcanvas" data-bs-target="#roleMenuOffcanvas" aria-controls="roleMenuOffcanvas">
+            <?php 
+            $currentUserRole = $_SESSION['role'] ?? '';
+            $isPaymentSuccessPage = strpos($_SERVER['REQUEST_URI'], 'payment_success.php') !== false;
+            if (!empty($currentUserRole) && $currentUserRole !== 'student' && !$isPaymentSuccessPage): 
+            ?>
+            <!-- <button class="hamburger-btn ms-3" type="button" data-bs-toggle="offcanvas" data-bs-target="#roleMenuOffcanvas" aria-controls="roleMenuOffcanvas">
                 <span class="hamburger-line"></span>
                 <span class="hamburger-line"></span>
                 <span class="hamburger-line"></span>
-            </button>
+            </button> -->
             <?php endif; ?>
         </div>
     </div>
@@ -408,12 +448,17 @@ document.addEventListener('DOMContentLoaded', function() {
             navbar.classList.remove('navbar-scrolled');
         }
         
-        // Optional: Hide/show navbar on scroll
-        if (scrollTop > lastScrollTop && scrollTop > 100) {
-            // Scrolling down
-            navbar.style.transform = 'translateY(-100%)';
+        // Optional: Hide/show navbar on scroll (disabled on mobile)
+        if (window.innerWidth > 991.98) {
+            if (scrollTop > lastScrollTop && scrollTop > 100) {
+                // Scrolling down
+                navbar.style.transform = 'translateY(-100%)';
+            } else {
+                // Scrolling up
+                navbar.style.transform = 'translateY(0)';
+            }
         } else {
-            // Scrolling up
+            // Keep navbar visible on mobile
             navbar.style.transform = 'translateY(0)';
         }
         
@@ -506,6 +551,11 @@ $userName = $_SESSION['name'] ?? '';
                             <i class="fas fa-home"></i> Dashboard Home
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="<?= $baseUrl ?>index.php">
+                            <i class="fas fa-globe"></i> Home
+                        </a>
+                    </li>
                 </ul>
             </div>
             
@@ -594,6 +644,11 @@ $userName = $_SESSION['name'] ?? '';
                             <i class="fas fa-clock"></i> Pending Evaluations
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="<?= $baseUrl ?>evaluator/evaluation_schemes.php">
+                            <i class="fas fa-file-contract"></i> Evaluation Schemes
+                        </a>
+                    </li>
                 </ul>
             </div>
             
@@ -652,6 +707,11 @@ $userName = $_SESSION['name'] ?? '';
                     <li class="nav-item">
                         <a class="nav-link" href="<?= $baseUrl ?>moderator/submissions.php?status=pending">
                             <i class="fas fa-clock"></i> Pending Submissions
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="<?= $baseUrl ?>moderator/evaluation_schemes.php">
+                            <i class="fas fa-file-contract"></i> Evaluation Schemes
                         </a>
                     </li>
                 </ul>
@@ -725,8 +785,8 @@ $userName = $_SESSION['name'] ?? '';
                 </h6>
                 <ul class="nav flex-column">
                     <li class="nav-item">
-                        <a class="nav-link" href="<?= $baseUrl ?>admin/answer_sheets.php">
-                            <i class="fas fa-file-document"></i> Answer Sheets
+                        <a class="nav-link" href="<?= $baseUrl ?>admin/manage_evaluation_schemes.php">
+                            <i class="fas fa-file-contract"></i> Evaluation Schemes
                         </a>
                     </li>
                     <li class="nav-item">
@@ -887,5 +947,5 @@ $userName = $_SESSION['name'] ?? '';
 </style>
 <?php endif; ?>
 
-<main class="flex-grow-1 py-4">
+<main class="flex-grow-1 py-2">
     <div class="container">
